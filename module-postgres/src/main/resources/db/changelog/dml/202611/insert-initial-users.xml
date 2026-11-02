@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet author="FStavcev" id="insert-initial-users-postgres">
+    <preConditions onFail="MARK_RAN">
+      <sqlCheck expectedResult="0">SELECT COUNT(*) FROM users</sqlCheck>
+    </preConditions>
+    <sql>
+      INSERT INTO users (username, email, created_at, updated_at)
+      VALUES ('postgres_admin', 'postgres.admin@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ,('postgres_reader', 'postgres.reader@example.com', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+    </sql>
+
+    <rollback>
+      <sql>DELETE FROM users WHERE username IN ('postgres_admin', 'postgres_reader');</sql>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

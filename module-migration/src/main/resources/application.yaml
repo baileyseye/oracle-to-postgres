@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: module-migration
+  datasource:
+    url: ${SOURCE_ORACLE_URL:jdbc:oracle:thin:@//localhost:1521/FREEPDB1}
+    username: ${SOURCE_ORACLE_USERNAME:system}
+    password: ${SOURCE_ORACLE_PASSWORD:oracle}
+    driver-class-name: oracle.jdbc.OracleDriver
+    hikari:
+      pool-name: migration-hikari
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1 FROM DUAL
+
+migration:
+  source:
+    schema: ${SOURCE_ORACLE_SCHEMA:}
+    row-limit: 100
+    excluded-tables:
+      - DATABASECHANGELOG
+      - DATABASECHANGELOGLOCK
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

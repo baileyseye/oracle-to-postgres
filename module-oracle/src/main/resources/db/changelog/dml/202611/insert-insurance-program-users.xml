@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet author="FStavcev" id="insert-insurance-program-users-oracle">
+    <preConditions onFail="MARK_RAN">
+      <sqlCheck expectedResult="0">SELECT COUNT(*) FROM insurance_program_users</sqlCheck>
+    </preConditions>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Alpha Insurance', 1001, 0, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Beta Insurance', 1002, 1, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Gamma Insurance', 1003, 0, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Delta Insurance', 1004, 1, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Epsilon Insurance', 1005, 0, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Zeta Insurance', 1006, 1, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Eta Insurance', 1007, 0, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Theta Insurance', 1008, 1, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Iota Insurance', 1009, 0, LOCALTIMESTAMP);
+    </sql>
+    <sql>
+      INSERT INTO insurance_program_users (name, membership, extra_opts, created)
+      VALUES ('Kappa Insurance', 1010, 1, LOCALTIMESTAMP);
+    </sql>
+
+    <rollback>
+      <sql>
+        DELETE FROM insurance_program_users
+        WHERE name IN (
+        'Alpha Insurance'
+        ,'Beta Insurance'
+        ,'Gamma Insurance'
+        ,'Delta Insurance'
+        ,'Epsilon Insurance'
+        ,'Zeta Insurance'
+        ,'Eta Insurance'
+        ,'Theta Insurance'
+        ,'Iota Insurance'
+        ,'Kappa Insurance'
+        );
+      </sql>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>
