@@ -23,7 +23,9 @@ migration:
       compare-check-constraints: true
   initial-load:
     chunk-size: 50000
-    truncate-target: false
+    # Демо-дефолт: initial-load начинает с чистого target.
+    # Для production или resume задайте MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET=false.
+    truncate-target: ${MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET:true}
     resume: false
     populate-mapping: false
     validate: true

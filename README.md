@@ -49,6 +49,7 @@ oracle-to-postgres/
 ├── build.gradle.kts             # только общие group/version/repositories; плагины apply false
 ├── gradle/wrapper/              # Gradle 9.8.2
 ├── docker-compose.yaml          # gvenzl/oracle-free:23-slim (1521) + postgres:17-alpine (5432)
+├── module-frontend/             # standalone React 19 + Vite витрина и LIVE-панель
 │
 ├── KODA.md                      # ПРАВИЛА КОДА — читать перед любой правкой (.gitignore)
 ├── LIQUIBASE-ARCHITECTURE.md    # ПРАВИЛА МИГРАЦИЙ — читать перед любой миграцией (.gitignore)
@@ -813,7 +814,7 @@ spring.datasource.hikari.pool-name: migration-source-hikari
 spring.datasource.hikari.connection-test-query: SELECT 1 FROM DUAL
 migration.mode: ${MIGRATION_MODE:initial-load}  # альтернатива: mirror — зеркальная синхронизация без даунтайма
 migration.initial-load.chunk-size: 50000
-migration.initial-load.truncate-target: false
+migration.initial-load.truncate-target: ${MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET:true}
 migration.initial-load.resume: false
 migration.initial-load.populate-mapping: false
 migration.initial-load.validate: true
@@ -950,6 +951,8 @@ docker compose up -d
 ```
 
 Запуск приложений — **Run/Debug конфигурации IntelliJ IDEA** (см. `KODA.md`, раздел «Сборка и запуск»).
+`JAVA_HOME` должен указывать на JDK 25: Gradle 9.8.2 не запустится на Java 8, а toolchain
+проекта требует 25. Проверьте `java -version` и Gradle JVM перед сборкой.
 
 Проверка живости: `GET http://localhost:8081/actuator/health`,
 `http://localhost:8082/actuator/health`, `http://localhost:8083/actuator/health`,
@@ -988,16 +991,20 @@ curl "http://localhost:8083/api/v1/migration/run/$JOB_ID"
 ```
 
 5. Если процесс упал, перезапустить его с `MIGRATION_INITIAL_LOAD_RESUME=true`
-   (`truncate-target` при этом должен быть `false`). Загрузка продолжит users и orders
-   с `MAX(id)` в target; pre-load script выполнится повторно и должен быть идемпотентным.
+   и явно `MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET=false` (в демо-конфиге truncate
+   по умолчанию `true`). Загрузка продолжит users и orders с `MAX(id)` в target;
+   pre-load script выполнится повторно и должен быть идемпотентным.
 6. Если после cutover планируется mirror-режим, задать `MIGRATION_INITIAL_LOAD_POPULATE_MAPPING=true`:
    карта заполнится как `source_id = target_id`.
 7. Дождаться, пока validation станет `valid=true`; при `FAILED` приложение не запускать.
    Затем стартовать приложение и smoke-тесты.
 
-По умолчанию initial-load требует пустой target. `truncate-target=true` очищает
+Initial-load требует пустой target. В демо-конфиге `truncate-target` по умолчанию
+`true` (env `MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET`), поэтому загрузка сама очищает
 `users`, `orders` и `migration_entity_map` (`RESTART IDENTITY`). Это удаляет и native-строки
 target, поэтому в окно cutover используется только для выделенного target.
+Для production или продолжения с `resume=true` явно задайте
+`MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET=false`.
 
 `MAX(id)` — checkpoint текущей загрузки, а не требование всегда держать target пустым.
 После успешного cutover target остаётся полным и используется приложением.
@@ -1014,6 +1021,32 @@ target, поэтому в окно cutover используется только
 диапазоны. Каждый worker читает только свои колонки, пишет COPY-чанками и коммитит
 отдельные транзакции; resume диапазона — `MAX(id)` внутри диапазона. Для таблиц без
 одиночного integer PK остаётся последовательное потоковое чтение.
+
+### 8.2 Frontend (DEMO / LIVE)
+
+`module-frontend/` — отдельное npm-приложение, не входящее в Gradle build. Витрина
+показывает архитектуру, режимы, код, типы и контракт API; DEMO работает без backend,
+LIVE подключается к модулям через Vite proxy.
+
+```bash
+cd module-frontend
+npm ci
+npm run dev
+# http://localhost:5173
+```
+
+- DEMO — детерминированная симуляция без запросов к 8081–8084.
+- LIVE — health, status, schema diff, tables и async job; при частичной недоступности
+  остаётся включённым, при полной — автоматически возвращается в DEMO.
+- Изменяющие операции в `#api` требуют armed-режима и подтверждения словом `MIGRATE`.
+- Команды запуска сценариев `public` и `auto_migration` собраны в секции `#start`.
+- В dev-режиме в `#api` есть кнопка `demo dataset`, которая через
+  `scripts/seed-large-oracle.ps1` заполняет Oracle до 2 000 000 users и
+  4 000 000 orders. Target-схема не меняется; production/preview эту кнопку
+  не получают.
+
+Полная документация, env-переменные и proxy-таблица:
+[`module-frontend/README.md`](module-frontend/README.md).
 
 ---
 
