@@ -3,6 +3,7 @@ import { SITE } from '../data/site';
 import { ApiEndpoints } from '../components/api/ApiEndpoints';
 import { LiveConsole } from '../components/api/LiveConsole';
 import { Reveal } from '../components/ui/Reveal';
+import { Container } from '../components/ui/Container';
 
 export function Api() {
   const endpointCount = API_SERVICES.reduce(
@@ -12,7 +13,7 @@ export function Api() {
 
   return (
     <section className="relative py-24 sm:py-28" id="api">
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -25,7 +26,7 @@ export function Api() {
                 MIGRATE. Здесь же — полный контракт эндпоинтов 8083 и 8084.
               </p>
             </div>
-            <div className="flex flex-col gap-2 font-mono text-[9px] text-muted/65 lg:items-end">
+            <div className="flex flex-col gap-2 font-mono text-micro text-muted/80 lg:items-end">
               <span>
                 {API_SERVICES.length} сервиса · {endpointCount} endpoints
               </span>
@@ -56,17 +57,17 @@ export function Api() {
         </Reveal>
 
         <Reveal delay={0.16}>
-          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-line bg-surface/35 px-4 py-3 font-mono text-[8.5px] leading-relaxed text-muted/50 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-2 rounded-lg border border-line bg-surface/35 px-4 py-3 font-mono text-micro leading-relaxed text-muted/70 sm:flex-row sm:items-center sm:justify-between">
             <span>
               UI base URL: VITE_ORACLE_BASE / VITE_POSTGRES_BASE /
               VITE_MIGRATION_BASE / VITE_SCHEMA_BASE
             </span>
-            <span className="text-muted/35">
+            <span className="text-muted/70">
               dev: Vite proxy /api/* → 8081–8084 · prod: nginx
             </span>
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

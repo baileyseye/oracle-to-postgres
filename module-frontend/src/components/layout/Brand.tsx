@@ -27,7 +27,7 @@ export function Brand({
         <span className="block whitespace-nowrap font-display text-[15px] font-semibold leading-none tracking-[-0.035em]">
           oracle<span className="mx-px text-electric">→</span>postgres
         </span>
-        <span className="mt-1 hidden whitespace-nowrap font-mono text-[9px] leading-none text-muted/80 sm:block">
+        <span className="mt-1 hidden whitespace-nowrap font-mono text-micro leading-none text-muted/80 sm:block">
           консоль миграции
         </span>
       </span>

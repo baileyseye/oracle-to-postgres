@@ -3,6 +3,7 @@ import { SITE } from '../data/site';
 import { cn } from '../lib/cn';
 import type { StrategyStatus } from '../types/modes';
 import { Reveal } from '../components/ui/Reveal';
+import { Container } from '../components/ui/Container';
 
 const STATUS_STYLE: Record<StrategyStatus, string> = {
   implemented: 'border-ok/30 bg-ok/10 text-ok',
@@ -19,7 +20,7 @@ const ACCENT: Record<string, string> = {
 export function Why() {
   return (
     <section className="relative py-24 sm:py-28" id="why">
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -33,7 +34,7 @@ export function Why() {
               </p>
             </div>
             <a
-              className="inline-flex shrink-0 items-center gap-1.5 font-mono text-[9.5px] text-muted transition-colors hover:text-text"
+              className="inline-flex shrink-0 items-center gap-1.5 font-mono text-micro text-muted transition-colors hover:text-text"
               href={SITE.readmeUrl}
               rel="noreferrer"
               target="_blank"
@@ -60,13 +61,13 @@ export function Why() {
                 <div className="flex items-start justify-between gap-3">
                   <span
                     className={cn(
-                      'rounded border px-1.5 py-0.5 font-mono text-[8.5px]',
+                      'rounded border px-1.5 py-0.5 font-mono text-micro',
                       STATUS_STYLE[strategy.status],
                     )}
                   >
                     {strategy.statusLabel}
                   </span>
-                  <span className="font-mono text-[9px] text-muted/40">
+                  <span className="font-mono text-micro text-muted/70">
                     {strategy.status === 'external' ? 'вручную' : 'в репо'}
                   </span>
                 </div>
@@ -80,17 +81,17 @@ export function Why() {
                 <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line/70 pt-4">
                   {strategy.metrics.map((metric) => (
                     <div key={metric.label}>
-                      <dt className="font-mono text-[8.5px] text-muted/60">
+                      <dt className="font-mono text-micro text-muted/80">
                         {metric.label}
                       </dt>
-                      <dd className="mt-0.5 text-[11px] leading-snug text-text/80">
+                      <dd className="mt-0.5 text-micro leading-snug text-text/80">
                         {metric.value}
                       </dd>
                     </div>
                   ))}
                 </dl>
 
-                <p className="mt-auto pt-5 text-[10.5px] leading-relaxed text-muted/60">
+                <p className="mt-auto pt-5 text-caption leading-relaxed text-muted/80">
                   {strategy.note}
                 </p>
               </article>
@@ -98,7 +99,7 @@ export function Why() {
           </div>
 
           <div className="mt-4 flex flex-col gap-3 rounded-lg border border-line bg-surface/35 px-4 py-3.5 sm:flex-row sm:items-start">
-            <span className="shrink-0 font-mono text-[9px] text-electric">
+            <span className="shrink-0 font-mono text-micro text-electric">
               вывод
             </span>
             <p className="text-[12.5px] leading-relaxed text-muted/85">
@@ -110,7 +111,7 @@ export function Why() {
             </p>
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

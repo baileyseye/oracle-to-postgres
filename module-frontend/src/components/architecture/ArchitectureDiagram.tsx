@@ -38,10 +38,10 @@ const ACCENT_TEXT: Record<ArchitectureAccent, string> = {
 };
 
 const HEALTH_COLOR: Record<ServiceHealthStatus, string> = {
-  up: '#34d399',
-  down: '#f87171',
-  checking: '#38bdf8',
-  unknown: '#93a4c3',
+  up: 'var(--color-ok)',
+  down: 'var(--color-danger)',
+  checking: 'var(--color-electric)',
+  unknown: 'var(--color-muted)',
 };
 
 interface ArchitectureDiagramProps {
@@ -272,10 +272,10 @@ export function ArchitectureDiagram({
           <circle cx="1.2" cy="1.2" fill="var(--color-line)" r="1" />
         </pattern>
         <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="1">
-          <stop offset="0" stopColor="#C74634" />
-          <stop offset="0.38" stopColor="#D946EF" />
-          <stop offset="0.72" stopColor="#38BDF8" />
-          <stop offset="1" stopColor="#336791" />
+          <stop offset="0" stopColor="var(--color-oracle)" />
+          <stop offset="0.38" stopColor="var(--color-magenta)" />
+          <stop offset="0.72" stopColor="var(--color-electric)" />
+          <stop offset="1" stopColor="var(--color-pg)" />
         </linearGradient>
         <marker
           id={markerId}
@@ -297,7 +297,7 @@ export function ArchitectureDiagram({
           refY="5"
           viewBox="0 0 10 10"
         >
-          <path d="M0,0 L10,5 L0,10 Z" fill="#38BDF8" />
+          <path d="M0,0 L10,5 L0,10 Z" fill="var(--color-electric)" />
         </marker>
       </defs>
 

@@ -8,6 +8,7 @@ import {
 import { SchemaOwnerSwitch } from '../components/architecture/SchemaOwnerSwitch';
 import { StartStepCard } from '../components/start/StartStepCard';
 import { Reveal } from '../components/ui/Reveal';
+import { Container } from '../components/ui/Container';
 import { getStartScenario, START_SHELL_OPTIONS } from '../data/start';
 import { SITE } from '../data/site';
 import { getSchemaOwnerOption } from '../lib/architecture';
@@ -49,11 +50,11 @@ export function Start() {
 
   return (
     <section className="relative py-24 sm:py-28" id="start">
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
-              <span className="inline-flex items-center gap-2 rounded-md border border-line bg-surface/55 px-2.5 py-1 font-mono text-[9px] text-muted">
+              <span className="inline-flex items-center gap-2 rounded-md border border-line bg-surface/55 px-2.5 py-1 font-mono text-micro text-muted">
                 <Rocket aria-hidden="true" className="h-3.5 w-3.5 text-electric" />
                 docker compose → LIVE
               </span>
@@ -66,7 +67,7 @@ export function Start() {
                 оболочку — команды ниже останутся реальными.
               </p>
             </div>
-            <div className="flex flex-wrap gap-1.5 font-mono text-[8.5px] text-muted/60 lg:justify-end">
+            <div className="flex flex-wrap gap-1.5 font-mono text-micro text-muted/80 lg:justify-end">
               <span className="rounded border border-line bg-bg/30 px-2 py-1">
                 6 шагов
               </span>
@@ -92,33 +93,33 @@ export function Start() {
             ))}
           </div>
 
-          <aside className="space-y-4 self-start lg:sticky lg:top-24 lg:col-span-4">
+          <aside className="space-y-4 self-start lg:sticky lg:top-[var(--sticky-top)] lg:col-span-4">
             <div className="panel overflow-hidden">
               <div className="border-b border-line px-4 py-3">
-                <h3 className="font-mono text-[10px] text-muted/70">
+                <h3 className="font-mono text-caption text-muted/70">
                   сценарий target
                 </h3>
               </div>
               <div className="p-4">
                 <SchemaOwnerSwitch onChange={setOwner} value={owner} />
 
-                <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-line pt-3 font-mono text-[9px]">
-                  <dt className="text-muted/50">schema</dt>
+                <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 border-t border-line pt-3 font-mono text-micro">
+                  <dt className="text-muted/70">schema</dt>
                   <dd className="text-text/80">{schemaOption.label}</dd>
-                  <dt className="text-muted/50">owner</dt>
+                  <dt className="text-muted/70">owner</dt>
                   <dd className="truncate text-text/80">
                     {schemaOption.ownerModule}
                   </dd>
-                  <dt className="text-muted/50">step</dt>
+                  <dt className="text-muted/70">step</dt>
                   <dd className="text-text/80">{schemaOption.schemaStep}</dd>
                 </dl>
 
-                <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
+                <p className="mt-3 text-micro leading-relaxed text-muted/70">
                   {schemaOption.detail}
                 </p>
 
                 <div className="mt-4 border-t border-line pt-3">
-                  <span className="font-mono text-[9px] text-muted/60">
+                  <span className="font-mono text-micro text-muted/80">
                     оболочка команд
                   </span>
                   <div
@@ -142,13 +143,13 @@ export function Start() {
                           onClick={() => setShell(option.id)}
                           type="button"
                         >
-                          <span className="block font-mono text-[9.5px]">
+                          <span className="block font-mono text-micro">
                             {option.label}
                           </span>
                           <span
                             className={cn(
-                              'mt-0.5 block font-mono text-[8px]',
-                              active ? 'text-text/55' : 'text-muted/45',
+                              'mt-0.5 block font-mono text-micro',
+                              active ? 'text-text/55' : 'text-muted/70',
                             )}
                           >
                             {option.hint}
@@ -162,7 +163,7 @@ export function Start() {
             </div>
 
             <div className="panel p-4">
-              <h3 className="inline-flex items-center gap-2 font-mono text-[10px] text-muted/70">
+              <h3 className="inline-flex items-center gap-2 font-mono text-caption text-muted/70">
                 <ShieldCheck
                   aria-hidden="true"
                   className="h-3.5 w-3.5 text-ok"
@@ -172,7 +173,7 @@ export function Start() {
               <ul className="mt-3 space-y-2">
                 {scenario.checklist.map((item) => (
                   <li
-                    className="flex items-start gap-2 text-[10.5px] leading-relaxed text-muted/75"
+                    className="flex items-start gap-2 text-caption leading-relaxed text-muted/75"
                     key={item}
                   >
                     <CircleCheck
@@ -186,14 +187,14 @@ export function Start() {
             </div>
 
             <div className="panel p-4">
-              <h3 className="font-mono text-[10px] text-muted/70">
+              <h3 className="font-mono text-caption text-muted/70">
                 материалы
               </h3>
               <ul className="mt-3 space-y-1">
                 {START_LINKS.map((link) => (
                   <li key={link.label}>
                     <a
-                      className="group flex items-center justify-between gap-3 border-b border-line/60 py-2 text-[11.5px] text-muted transition-colors hover:text-text"
+                      className="group flex items-center justify-between gap-3 border-b border-line/60 py-2 text-caption text-muted transition-colors hover:text-text"
                       href={link.href}
                       rel="noreferrer"
                       target="_blank"
@@ -202,10 +203,10 @@ export function Start() {
                         <span className="truncate">{link.label}</span>
                         <ArrowUpRight
                           aria-hidden="true"
-                          className="h-3 w-3 shrink-0 text-muted/60 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                          className="h-3 w-3 shrink-0 text-muted/80 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                         />
                       </span>
-                      <span className="shrink-0 font-mono text-[8px] text-muted/40">
+                      <span className="shrink-0 font-mono text-micro text-muted/70">
                         {link.hint}
                       </span>
                     </a>
@@ -213,7 +214,7 @@ export function Start() {
                 ))}
               </ul>
               <a
-                className="mt-3 inline-flex items-center gap-1.5 font-mono text-[9px] text-electric/80 transition-colors hover:text-electric"
+                className="mt-3 inline-flex items-center gap-1.5 font-mono text-micro text-electric/80 transition-colors hover:text-electric"
                 href="#api"
               >
                 LIVE-консоль и контракт API →
@@ -223,17 +224,17 @@ export function Start() {
         </div>
 
         <Reveal delay={0.1}>
-          <div className="mt-4 flex flex-col gap-1 rounded-lg border border-line bg-surface/35 px-4 py-3 font-mono text-[8.5px] leading-relaxed text-muted/50 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-1 rounded-lg border border-line bg-surface/35 px-4 py-3 font-mono text-micro leading-relaxed text-muted/70 sm:flex-row sm:items-center sm:justify-between">
             <span>
               Минимальный путь: docker compose → build → выбранная схема →
               async run → LIVE
             </span>
-            <span className="text-muted/35">
+            <span className="text-muted/70">
               pre/post SQL, resume и validation — в README
             </span>
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

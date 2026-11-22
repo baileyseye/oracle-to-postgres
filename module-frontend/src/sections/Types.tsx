@@ -1,6 +1,7 @@
 import { TYPE_MAPPINGS, UNSUPPORTED_OBJECTS } from '../data/type-mappings';
 import { TypeFidelity as TypeFidelityView } from '../components/types/TypeFidelity';
 import { Reveal } from '../components/ui/Reveal';
+import { Container } from '../components/ui/Container';
 
 export function Types() {
   const warningCount = TYPE_MAPPINGS.filter(
@@ -9,7 +10,7 @@ export function Types() {
 
   return (
     <section className="relative py-24 sm:py-28" id="types">
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
           <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-2xl">
@@ -25,17 +26,17 @@ export function Types() {
                 Unsupported-объекты не генерируются автоматически.
               </p>
             </div>
-            <dl className="grid grid-cols-3 gap-x-6 gap-y-2 font-mono text-[9px] text-muted/65 lg:text-right">
+            <dl className="grid grid-cols-3 gap-x-6 gap-y-2 font-mono text-micro text-muted/80 lg:text-right">
               <div>
-                <dt className="text-muted/45">строк</dt>
+                <dt className="text-muted/70">строк</dt>
                 <dd className="mt-0.5 text-text/80">{TYPE_MAPPINGS.length}</dd>
               </div>
               <div>
-                <dt className="text-muted/45">warning</dt>
+                <dt className="text-muted/70">warning</dt>
                 <dd className="mt-0.5 text-warn/90">{warningCount}</dd>
               </div>
               <div>
-                <dt className="text-muted/45">unsupported</dt>
+                <dt className="text-muted/70">unsupported</dt>
                 <dd className="mt-0.5 text-muted/80">
                   {UNSUPPORTED_OBJECTS.length}
                 </dd>
@@ -49,7 +50,7 @@ export function Types() {
             <TypeFidelityView />
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

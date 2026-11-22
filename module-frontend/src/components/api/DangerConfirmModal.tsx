@@ -171,7 +171,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
                 >
                   {meta.title}
                 </h2>
-                <p className="mt-1 font-mono text-[9px] text-danger/80">
+                <p className="mt-1 font-mono text-micro text-danger/80">
                   {meta.endpoint}
                 </p>
               </div>
@@ -186,7 +186,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
             </button>
           </div>
 
-          <p className="mt-4 rounded-md border border-danger/25 bg-danger/5 px-3 py-2.5 text-[12px] leading-relaxed text-text/80">
+          <p className="mt-4 rounded-md border border-danger/25 bg-danger/5 px-3 py-2.5 text-caption leading-relaxed text-text/80">
             {meta.description}{' '}
             <strong className="font-medium text-danger">
               {meta.warning}
@@ -194,7 +194,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
           </p>
 
           <label
-            className="mt-4 block font-mono text-[9px] text-muted/70"
+            className="mt-4 block font-mono text-micro text-muted/70"
             htmlFor={inputId}
           >
             введите {meta.confirmationWord} для подтверждения
@@ -202,7 +202,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
           <input
             aria-describedby={`${inputId}-hint`}
             autoComplete="off"
-            className="mt-1.5 h-10 w-full rounded-md border border-line bg-bg/55 px-3 font-mono text-[12px] tracking-[0.18em] text-text placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/35 focus:border-danger/50 focus:ring-1 focus:ring-danger/30"
+            className="mt-1.5 h-10 w-full rounded-md border border-line bg-bg/55 px-3 font-mono text-caption tracking-[0.18em] text-text placeholder:normal-case placeholder:tracking-normal placeholder:text-muted/70 focus:border-danger/50 focus:ring-1 focus:ring-danger/30"
             id={inputId}
             onChange={(event) =>
               setConfirmation(event.target.value.toUpperCase())
@@ -214,7 +214,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
             value={confirmation}
           />
           <p
-            className="mt-1.5 font-mono text-[8.5px] text-muted/45"
+            className="mt-1.5 font-mono text-micro text-muted/70"
             id={`${inputId}-hint`}
           >
             кнопка станет активной только при точном совпадении слова
@@ -222,7 +222,7 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
 
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
             <button
-              className="inline-flex h-9 items-center rounded-md border border-line px-3.5 font-mono text-[10px] text-muted transition-colors hover:text-text"
+              className="inline-flex h-9 items-center rounded-md border border-line px-3.5 font-mono text-caption text-muted transition-colors hover:text-text"
               onClick={onClose}
               type="button"
             >
@@ -230,10 +230,10 @@ function ConfirmDialog({ action, onClose, onConfirm }: DialogProps) {
             </button>
             <button
               className={cn(
-                'inline-flex h-9 items-center rounded-md px-3.5 font-mono text-[10px] font-semibold transition-colors',
+                'inline-flex h-9 items-center rounded-md px-3.5 font-mono text-caption font-semibold transition-colors',
                 valid
                   ? 'border border-danger/45 bg-danger/15 text-danger hover:bg-danger/25'
-                  : 'cursor-not-allowed border border-line bg-surface/40 text-muted/35',
+                  : 'cursor-not-allowed border border-line bg-surface/40 text-muted/70',
               )}
               disabled={!valid}
               onClick={onConfirm}

@@ -15,11 +15,11 @@ export function StartStepCard({ step, index }: StartStepCardProps) {
     <article className="panel relative overflow-hidden">
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 left-0 w-px bg-[linear-gradient(180deg,#38bdf8_0%,#d946ef_55%,transparent_100%)] opacity-70"
+        className="absolute inset-y-0 left-0 w-px bg-[linear-gradient(180deg,var(--color-electric)_0%,var(--color-magenta)_55%,transparent_100%)] opacity-70"
       />
       <div className="grid gap-4 p-4 sm:grid-cols-[44px_1fr] sm:p-5">
         <div>
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-bg/45 font-mono text-[10px] text-electric">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-line bg-bg/45 font-mono text-caption text-electric">
             {String(index).padStart(2, '0')}
           </span>
         </div>
@@ -45,7 +45,7 @@ export function StartStepCard({ step, index }: StartStepCardProps) {
           {step.note ? (
             <p
               className={cn(
-                'mt-3 flex items-start gap-2 rounded border px-2.5 py-2 text-[10.5px] leading-relaxed',
+                'mt-3 flex items-start gap-2 rounded border px-2.5 py-2 text-caption leading-relaxed',
                 warning
                   ? 'border-warn/25 bg-warn/5 text-warn/85'
                   : 'border-line bg-bg/30 text-muted/70',
@@ -59,7 +59,7 @@ export function StartStepCard({ step, index }: StartStepCardProps) {
               ) : (
                 <Terminal
                   aria-hidden="true"
-                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted/60"
+                  className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted/80"
                 />
               )}
               <span>{step.note}</span>

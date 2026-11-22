@@ -4,6 +4,7 @@ import { NAV_ITEMS, NAV_SECTION_IDS, SITE } from '../../data/site';
 import { useScrollSpy } from '../../hooks/useScrollSpy';
 import { useScrolled } from '../../hooks/useScrolled';
 import { cn } from '../../lib/cn';
+import { Container } from '../ui/Container';
 import { GithubIcon } from '../ui/GithubIcon';
 import { RuntimeModeSwitch } from '../live/RuntimeModeSwitch';
 import { ServiceHealthStrip } from '../live/ServiceHealth';
@@ -28,7 +29,7 @@ export function Navbar() {
             : 'border-transparent',
         )}
       >
-        <div className="mx-auto flex h-[72px] w-full max-w-[1240px] items-center gap-3 px-5 sm:px-8">
+        <Container className="flex h-[var(--nav-height)] items-center gap-3">
           <Brand wordmarkClassName="hidden sm:block" />
           <nav aria-label="Разделы страницы" className="ml-5 hidden xl:block">
             <ul className="flex items-center gap-0.5">
@@ -84,7 +85,7 @@ export function Navbar() {
               <Menu aria-hidden="true" className="h-[18px] w-[18px]" />
             </button>
           </div>
-        </div>
+        </Container>
       </header>
       <MobileMenu
         activeId={activeId}

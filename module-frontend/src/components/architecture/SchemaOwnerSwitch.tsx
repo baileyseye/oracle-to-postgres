@@ -10,7 +10,7 @@ interface SchemaOwnerSwitchProps {
 export function SchemaOwnerSwitch({ value, onChange }: SchemaOwnerSwitchProps) {
   return (
     <div className="mt-2 flex flex-col gap-1 rounded-xl border border-line bg-surface/45 p-1 sm:flex-row sm:items-center">
-      <span className="shrink-0 px-2 font-mono text-[9px] text-muted/80">
+      <span className="shrink-0 px-2 font-mono text-micro text-muted/80">
         схема
       </span>
       <div
@@ -41,15 +41,15 @@ export function SchemaOwnerSwitch({ value, onChange }: SchemaOwnerSwitchProps) {
                   aria-hidden="true"
                   className={cn(
                     'status-led',
-                    active ? 'text-electric' : 'text-muted/50',
+                    active ? 'text-electric' : 'text-muted/70',
                   )}
                 />
-                <span className="font-mono text-[10px]">{option.label}</span>
+                <span className="font-mono text-caption">{option.label}</span>
               </span>
               <span
                 className={cn(
-                  'whitespace-nowrap font-mono text-[9px]',
-                  active ? 'text-text/65' : 'text-muted/65',
+                  'whitespace-nowrap font-mono text-micro',
+                  active ? 'text-text/65' : 'text-muted/80',
                 )}
               >
                 {option.shortDescription}

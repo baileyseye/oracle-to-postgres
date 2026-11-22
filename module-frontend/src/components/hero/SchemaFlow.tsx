@@ -16,10 +16,10 @@ function SourceCard() {
       />
       <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-2.5">
         <TrafficDots />
-        <span className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-muted/80">
+        <span className="min-w-0 flex-1 truncate text-center font-mono text-caption text-muted/80">
           oracle / FREEPDB1
         </span>
-        <span className="border border-oracle/30 bg-oracle/10 px-1.5 py-0.5 font-mono text-[9px] leading-none text-oracle">
+        <span className="border border-oracle/30 bg-oracle/10 px-1.5 py-0.5 font-mono text-micro leading-none text-oracle">
           source
         </span>
       </div>
@@ -28,37 +28,37 @@ function SourceCard() {
           <p className="font-display text-base font-medium leading-none">
             Oracle
           </p>
-          <p className="font-mono text-[11px] leading-none text-oracle">
+          <p className="font-mono text-micro leading-none text-oracle">
             :1521
           </p>
         </div>
         <dl className="mt-3 space-y-1.5">
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               users
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               keyset
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               orders
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               copy
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               insurance_program_users
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               generic
             </dd>
           </div>
         </dl>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2 font-mono text-[9.5px] text-muted/80">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2 font-mono text-micro text-muted/80">
           <span className="truncate">v$session idle guard</span>
           <span className="inline-flex shrink-0 items-center gap-1.5 text-ok">
             <span aria-hidden="true" className="status-led" />
@@ -82,10 +82,10 @@ function TargetCard() {
       />
       <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-2.5">
         <TrafficDots />
-        <span className="min-w-0 flex-1 truncate text-center font-mono text-[10px] text-muted/80">
+        <span className="min-w-0 flex-1 truncate text-center font-mono text-caption text-muted/80">
           postgres / oracletopostgres
         </span>
-        <span className="border border-electric/25 bg-electric/10 px-1.5 py-0.5 font-mono text-[9px] leading-none text-electric">
+        <span className="border border-electric/25 bg-electric/10 px-1.5 py-0.5 font-mono text-micro leading-none text-electric">
           target
         </span>
       </div>
@@ -94,37 +94,37 @@ function TargetCard() {
           <p className="font-display text-base font-medium leading-none">
             PostgreSQL
           </p>
-          <p className="font-mono text-[11px] leading-none text-electric">
+          <p className="font-mono text-micro leading-none text-electric">
             :5432
           </p>
         </div>
         <dl className="mt-3 space-y-1.5">
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               public
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               liquibase
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               auto_migration
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               schema migrator
             </dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="truncate font-mono text-[11px] text-text/85">
+            <dt className="truncate font-mono text-micro text-text/85">
               migration_entity_map
             </dt>
-            <dd className="shrink-0 font-mono text-[9.5px] text-muted/80">
+            <dd className="shrink-0 font-mono text-micro text-muted/80">
               mapping
             </dd>
           </div>
         </dl>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2 font-mono text-[9.5px] text-muted/80">
+        <div className="mt-3 flex items-center justify-between gap-3 border-t border-line pt-2 font-mono text-micro text-muted/80">
           <span className="truncate">identity restart</span>
           <span className="inline-flex shrink-0 items-center gap-1.5 text-warn">
             <span aria-hidden="true" className="status-led" />
@@ -141,18 +141,18 @@ export function SchemaFlow() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <div className="relative mx-auto w-full max-w-[440px]">
+    <div className="relative mx-auto w-full max-w-[440px] 2xl:max-w-[480px]">
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -inset-8 bg-[radial-gradient(circle_at_25%_18%,rgba(199,70,52,0.13),transparent_55%),radial-gradient(circle_at_78%_82%,rgba(56,189,248,0.11),transparent_55%)]"
       />
       <SourceCard />
-      <div className="relative h-[96px] sm:h-[104px]">
+      <div className="relative mx-auto aspect-[420/104] w-full">
         <svg
           aria-hidden="true"
           className="absolute inset-0 h-full w-full overflow-visible"
           fill="none"
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
           viewBox="0 0 420 104"
         >
           <defs>
@@ -163,10 +163,10 @@ export function SchemaFlow() {
               y1="0"
               y2="1"
             >
-              <stop offset="0" stopColor="#C74634" />
-              <stop offset="0.38" stopColor="#D946EF" />
-              <stop offset="0.72" stopColor="#38BDF8" />
-              <stop offset="1" stopColor="#336791" />
+              <stop offset="0" stopColor="var(--color-oracle)" />
+              <stop offset="0.38" stopColor="var(--color-magenta)" />
+              <stop offset="0.72" stopColor="var(--color-electric)" />
+              <stop offset="1" stopColor="var(--color-pg)" />
             </linearGradient>
           </defs>
           <path
@@ -223,7 +223,7 @@ export function SchemaFlow() {
             </>
           )}
         </svg>
-        <div className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-md border border-line bg-bg/95 px-2.5 py-1 font-mono text-[9px] text-muted shadow-[0_12px_30px_-14px_rgba(0,0,0,0.9)] backdrop-blur">
+        <div className="absolute left-1/2 top-1/2 inline-flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-md border border-line bg-bg/95 px-2.5 py-1 font-mono text-micro text-muted shadow-[0_12px_30px_-14px_rgba(0,0,0,0.9)] backdrop-blur">
           <span aria-hidden="true" className="status-led text-electric" />
           COPY
         </div>

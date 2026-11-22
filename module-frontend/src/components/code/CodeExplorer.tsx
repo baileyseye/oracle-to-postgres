@@ -43,14 +43,14 @@ function CodeFileRow({
         aria-hidden="true"
         className={cn(
           'mt-0.5 h-3.5 w-3.5 shrink-0',
-          active ? 'text-electric' : 'text-muted/45',
+          active ? 'text-electric' : 'text-muted/70',
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate font-mono text-[10.5px]">
+        <span className="block truncate font-mono text-caption">
           {file.name}
         </span>
-        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-[8px] text-muted/55">
+        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-micro text-muted/70">
           {showModule ? <span>{module.label}</span> : null}
           {snippet ? (
             <span>
@@ -58,7 +58,7 @@ function CodeFileRow({
             </span>
           ) : null}
         </span>
-        <span className="mt-1 block line-clamp-2 text-[10px] leading-relaxed text-muted/65">
+        <span className="mt-1 block line-clamp-2 text-caption leading-relaxed text-muted/80">
           {file.summary}
         </span>
       </span>
@@ -132,11 +132,11 @@ export function CodeExplorer() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <TrafficDots />
-          <span className="truncate font-mono text-[10px] text-muted">
+          <span className="truncate font-mono text-caption text-muted">
             обозреватель кода
           </span>
         </div>
-        <span className="font-mono text-[9px] text-muted/60">
+        <span className="font-mono text-micro text-muted/80">
           {CODE_MODULES.reduce((total, module) => total + module.files.length, 0)}{' '}
           файлов
         </span>
@@ -170,13 +170,13 @@ export function CodeExplorer() {
                       aria-hidden="true"
                       className={cn(
                         'status-led',
-                        active ? 'text-electric' : 'text-muted/40',
+                        active ? 'text-electric' : 'text-muted/70',
                       )}
                     />
-                    <span className="font-mono text-[10.5px]">
+                    <span className="font-mono text-caption">
                       {module.label}
                     </span>
-                    <span className="font-mono text-[8.5px] text-muted/55">
+                    <span className="font-mono text-micro text-muted/70">
                       :{module.port}
                     </span>
                   </span>
@@ -194,11 +194,11 @@ export function CodeExplorer() {
           <div className="relative min-w-0 flex-1">
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted/50"
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted/70"
             />
             <input
               aria-label="Поиск по коду"
-              className="h-9 w-full rounded-md border border-line bg-bg/45 pl-8 pr-16 font-mono text-[10px] text-text placeholder:text-muted/40 focus:border-electric/40 focus:ring-1 focus:ring-electric/30"
+              className="h-9 w-full rounded-md border border-line bg-bg/45 pl-8 pr-16 font-mono text-caption text-text placeholder:text-muted/70 focus:border-electric/40 focus:ring-1 focus:ring-electric/30"
               onChange={(event) => handleQueryChange(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
@@ -213,7 +213,7 @@ export function CodeExplorer() {
               {searchActive ? (
                 <span
                   aria-live="polite"
-                  className="font-mono text-[8px] text-muted/50"
+                  className="font-mono text-micro text-muted/70"
                 >
                   {results.length}
                 </span>
@@ -235,9 +235,9 @@ export function CodeExplorer() {
 
       <div className="grid min-w-0 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="min-w-0 border-b border-line lg:border-b-0 lg:border-r">
-          <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2 font-mono text-[8.5px] text-muted/60">
+          <div className="flex items-center justify-between gap-2 border-b border-line/60 px-3 py-2 font-mono text-micro text-muted/80">
             <span>{searchActive ? 'результаты поиска' : 'файлы'}</span>
-            <span className="text-muted/40">
+            <span className="text-muted/70">
               {searchActive ? results.length : activeModule?.files.length}
             </span>
           </div>
@@ -261,10 +261,10 @@ export function CodeExplorer() {
                 </div>
               ) : (
                 <div className="px-2 py-6 text-center">
-                  <p className="font-mono text-[10px] text-muted/60">
+                  <p className="font-mono text-caption text-muted/80">
                     ничего не найдено
                   </p>
-                  <p className="mt-1 text-[10px] leading-relaxed text-muted/40">
+                  <p className="mt-1 text-caption leading-relaxed text-muted/70">
                     Попробуйте имя класса, метода или SQL-фрагмент.
                   </p>
                 </div>
@@ -291,28 +291,28 @@ export function CodeExplorer() {
             <div className="space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-[9px] text-muted/65">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-micro text-muted/80">
                     <span>{displayModule.label}</span>
-                    <span className="text-muted/30">/</span>
+                    <span className="text-muted/70">/</span>
                     <span>{displaySnippet.title}</span>
                   </div>
                   <h3 className="mt-1 break-words font-mono text-[15px] text-text">
                     {displayFile.name}
                   </h3>
-                  <p className="mt-1 text-[11.5px] leading-relaxed text-muted/75">
+                  <p className="mt-1 text-caption leading-relaxed text-muted/75">
                     {displayFile.summary}
                   </p>
                 </div>
-                <span className="shrink-0 rounded border border-line bg-bg/35 px-1.5 py-0.5 font-mono text-[8.5px] text-muted/60">
+                <span className="shrink-0 rounded border border-line bg-bg/35 px-1.5 py-0.5 font-mono text-micro text-muted/80">
                   {displaySnippet.startLine}–{displaySnippet.endLine}
                 </span>
               </div>
 
               <div className="rounded-md border border-electric/20 bg-electric/5 px-3 py-2.5">
-                <p className="font-mono text-[9px] text-electric/80">
+                <p className="font-mono text-micro text-electric/80">
                   что здесь важно
                 </p>
-                <p className="mt-1 text-[11.5px] leading-relaxed text-text/80">
+                <p className="mt-1 text-caption leading-relaxed text-text/80">
                   {displaySnippet.note}
                 </p>
               </div>
@@ -332,12 +332,12 @@ export function CodeExplorer() {
             <div className="flex min-h-[280px] flex-col items-center justify-center px-4 text-center">
               <Search
                 aria-hidden="true"
-                className="h-6 w-6 text-muted/35"
+                className="h-6 w-6 text-muted/70"
               />
-              <p className="mt-3 font-mono text-[11px] text-muted/65">
+              <p className="mt-3 font-mono text-micro text-muted/80">
                 {searchActive ? 'Поиск не дал файлов' : 'Выберите файл'}
               </p>
-              <p className="mt-1 max-w-xs text-[10.5px] leading-relaxed text-muted/45">
+              <p className="mt-1 max-w-xs text-caption leading-relaxed text-muted/70">
                 {searchActive
                   ? 'Измените запрос или очистите поиск, чтобы вернуться к списку файлов.'
                   : 'Слева — файлы выбранного модуля; справа появится сниппет.'}
@@ -347,7 +347,7 @@ export function CodeExplorer() {
         </div>
       </div>
 
-      <div className="border-t border-line px-4 py-2 font-mono text-[8.5px] text-muted/50">
+      <div className="border-t border-line px-4 py-2 font-mono text-micro text-muted/70">
         сниппеты — методы целиком · полный файл доступен по ссылке GitHub
       </div>
     </div>

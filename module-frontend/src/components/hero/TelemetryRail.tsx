@@ -1,4 +1,5 @@
 import type { HeroStat } from '../../types/site';
+import { Container } from '../ui/Container';
 import { useCountUp } from '../../hooks/useCountUp';
 import { formatCount } from '../../lib/format';
 
@@ -23,7 +24,7 @@ function HeroStatCell({ stat }: HeroStatCellProps) {
       <p className="mt-2 text-[13px] leading-snug text-text/80">
         {stat.label}
       </p>
-      <p className="mt-1 break-words font-mono text-[10px] leading-relaxed text-muted/80">
+      <p className="mt-1 break-words font-mono text-caption leading-relaxed text-muted/80">
         {stat.detail}
       </p>
     </div>
@@ -42,13 +43,13 @@ export function TelemetryRail({ stats }: TelemetryRailProps) {
         aria-label="Ключевые параметры миграции"
         className="border-b border-line bg-surface/20"
       >
-        <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+        <Container>
           <div className="grid grid-cols-2 gap-px bg-line lg:grid-cols-4">
             {stats.map((stat) => (
               <HeroStatCell key={stat.detail} stat={stat} />
             ))}
           </div>
-        </div>
+        </Container>
       </section>
     </div>
   );

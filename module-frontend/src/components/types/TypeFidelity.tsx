@@ -17,6 +17,7 @@ import {
   filterUnsupportedObjects,
 } from '../../lib/fidelity';
 import { cn } from '../../lib/cn';
+import { ScrollFade } from '../ui/ScrollFade';
 import type { FidelityFilter } from '../../types/schema-fidelity';
 
 const AUTO_COUNT = TYPE_MAPPINGS.filter((row) => row.level === 'auto').length;
@@ -61,11 +62,11 @@ export function TypeFidelity() {
           <div className="relative min-w-0 flex-1">
             <Search
               aria-hidden="true"
-              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted/50"
+              className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted/70"
             />
             <input
               aria-label="Поиск по типам и unsupported-объектам"
-              className="h-9 w-full rounded-md border border-line bg-bg/45 pl-8 pr-16 font-mono text-[10px] text-text placeholder:text-muted/40 focus:border-electric/40 focus:ring-1 focus:ring-electric/30"
+              className="h-9 w-full rounded-md border border-line bg-bg/45 pl-8 pr-16 font-mono text-caption text-text placeholder:text-muted/70 focus:border-electric/40 focus:ring-1 focus:ring-electric/30"
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
@@ -80,7 +81,7 @@ export function TypeFidelity() {
               {searchActive ? (
                 <span
                   aria-live="polite"
-                  className="font-mono text-[8px] text-muted/50"
+                  className="font-mono text-micro text-muted/70"
                 >
                   {unsupportedView ? unsupported.length : rows.length}
                 </span>
@@ -107,7 +108,7 @@ export function TypeFidelity() {
               <button
                 aria-pressed={filter === item.id}
                 className={cn(
-                  'relative inline-flex items-center gap-2 rounded-md px-2.5 py-2 font-mono text-[9px] transition-colors',
+                  'relative inline-flex items-center gap-2 rounded-md px-2.5 py-2 font-mono text-micro transition-colors',
                   filter === item.id
                     ? 'bg-surface-2 text-text'
                     : 'text-muted hover:bg-surface/60 hover:text-text',
@@ -119,10 +120,10 @@ export function TypeFidelity() {
                 {item.label}
                 <span
                   className={cn(
-                    'rounded border px-1 py-0.5 text-[8px]',
+                    'rounded border px-1 py-0.5 text-micro',
                     filter === item.id
                       ? 'border-electric/25 bg-electric/10 text-electric/80'
-                      : 'border-line text-muted/45',
+                      : 'border-line text-muted/70',
                   )}
                 >
                   {item.count}
@@ -145,7 +146,7 @@ export function TypeFidelity() {
             <h3 className="font-display text-lg font-medium">
               Unsupported → manual review
             </h3>
-            <p className="mt-1 max-w-[75ch] text-[12px] leading-relaxed text-muted/75">
+            <p className="mt-1 max-w-[75ch] text-caption leading-relaxed text-muted/75">
               Эти объекты не переносятся автоматически. Они попадают в
               unsupportedObjects/warnings и требуют отдельного решения до
               production.
@@ -163,11 +164,11 @@ export function TypeFidelity() {
                       <Ban aria-hidden="true" className="h-3.5 w-3.5" />
                     </span>
                     {object.detectedAs ? (
-                      <code className="rounded border border-line bg-surface/50 px-1.5 py-0.5 font-mono text-[8px] text-muted/65">
+                      <code className="rounded border border-line bg-surface/50 px-1.5 py-0.5 font-mono text-micro text-muted/80">
                         {object.detectedAs}
                       </code>
                     ) : (
-                      <span className="font-mono text-[8px] text-muted/45">
+                      <span className="font-mono text-micro text-muted/70">
                         manual review
                       </span>
                     )}
@@ -175,7 +176,7 @@ export function TypeFidelity() {
                   <h4 className="mt-3 font-display text-base font-medium">
                     {object.title}
                   </h4>
-                  <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted/70">
+                  <p className="mt-1.5 text-caption leading-relaxed text-muted/70">
                     {object.note}
                   </p>
                 </article>
@@ -183,10 +184,10 @@ export function TypeFidelity() {
             </div>
           ) : (
             <div className="px-4 py-10 text-center">
-              <p className="font-mono text-[10px] text-muted/65">
+              <p className="font-mono text-caption text-muted/80">
                 Ничего не найдено
               </p>
-              <p className="mt-1 text-[10.5px] text-muted/45">
+              <p className="mt-1 text-caption text-muted/70">
                 Измените запрос или очистите поиск.
               </p>
             </div>
@@ -195,38 +196,36 @@ export function TypeFidelity() {
       ) : (
         <>
           <div className="panel overflow-hidden">
-            <p className="border-b border-line px-4 py-2 font-mono text-[8.5px] text-muted/45 sm:hidden">
+            <p className="border-b border-line px-4 py-2 font-mono text-micro text-muted/70 sm:hidden">
               таблица прокручивается по горизонтали
             </p>
-            <div
+            <ScrollFade
               aria-label="Таблица маппинга типов"
-              className="scroll-area max-h-[560px] overflow-auto"
-              role="region"
-              tabIndex={0}
+              className="max-h-[560px] overflow-auto"
             >
               <table className="w-full min-w-[760px] border-collapse text-left">
                 <thead className="sticky top-0 z-10 bg-surface">
                   <tr className="border-b border-line">
                     <th
-                      className="px-4 py-3 font-mono text-[9px] font-normal text-muted"
+                      className="px-4 py-3 font-mono text-micro font-normal text-muted"
                       scope="col"
                     >
                       Oracle
                     </th>
                     <th
-                      className="px-4 py-3 font-mono text-[9px] font-normal text-muted"
+                      className="px-4 py-3 font-mono text-micro font-normal text-muted"
                       scope="col"
                     >
                       PostgreSQL
                     </th>
                     <th
-                      className="w-[18%] px-4 py-3 font-mono text-[9px] font-normal text-muted"
+                      className="w-[18%] px-4 py-3 font-mono text-micro font-normal text-muted"
                       scope="col"
                     >
                       fidelity
                     </th>
                     <th
-                      className="px-4 py-3 font-mono text-[9px] font-normal text-muted"
+                      className="px-4 py-3 font-mono text-micro font-normal text-muted"
                       scope="col"
                     >
                       что проверить
@@ -243,15 +242,15 @@ export function TypeFidelity() {
                         className="px-4 py-3 text-left align-top"
                         scope="row"
                       >
-                        <code className="font-mono text-[10.5px] text-text/85">
+                        <code className="font-mono text-caption text-text/85">
                           {row.oracleType}
                         </code>
-                        <span className="mt-1 block font-mono text-[8px] text-muted/45">
+                        <span className="mt-1 block font-mono text-micro text-muted/70">
                           {row.category}
                         </span>
                         <span
                           className={cn(
-                            'mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-[8.5px] sm:hidden',
+                            'mt-1.5 inline-flex rounded border px-1.5 py-0.5 font-mono text-micro sm:hidden',
                             row.level === 'auto'
                               ? 'border-ok/25 bg-ok/10 text-ok'
                               : 'border-warn/25 bg-warn/10 text-warn',
@@ -261,14 +260,14 @@ export function TypeFidelity() {
                         </span>
                       </th>
                       <td className="px-4 py-3 align-top">
-                        <code className="font-mono text-[10.5px] text-electric/90">
+                        <code className="font-mono text-caption text-electric/90">
                           {row.postgresType}
                         </code>
                       </td>
                       <td className="px-4 py-3 align-top">
                         <span
                           className={cn(
-                            'inline-flex rounded border px-1.5 py-0.5 font-mono text-[8.5px]',
+                            'inline-flex rounded border px-1.5 py-0.5 font-mono text-micro',
                             row.level === 'auto'
                               ? 'border-ok/25 bg-ok/10 text-ok'
                               : 'border-warn/25 bg-warn/10 text-warn',
@@ -277,27 +276,27 @@ export function TypeFidelity() {
                           {row.level}
                         </span>
                       </td>
-                      <td className="px-4 py-3 align-top text-[11px] leading-relaxed text-muted/75">
+                      <td className="px-4 py-3 align-top text-micro leading-relaxed text-muted/75">
                         {row.note}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollFade>
             {rows.length === 0 ? (
               <div className="px-4 py-10 text-center">
-                <p className="font-mono text-[10px] text-muted/65">
+                <p className="font-mono text-caption text-muted/80">
                   По фильтру ничего не найдено
                 </p>
-                <p className="mt-1 text-[10.5px] leading-relaxed text-muted/45">
+                <p className="mt-1 text-caption leading-relaxed text-muted/70">
                   {unsupported.length > 0
                     ? `Есть совпадения в unsupported: ${unsupported.length}. Откройте фильтр unsupported.`
                     : 'Измените запрос или очистите поиск.'}
                 </p>
                 {unsupported.length > 0 ? (
                   <button
-                    className="mt-3 inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 font-mono text-[9px] text-muted hover:border-warn/40 hover:text-warn"
+                    className="mt-3 inline-flex items-center gap-1.5 rounded border border-line px-2.5 py-1.5 font-mono text-micro text-muted hover:border-warn/40 hover:text-warn"
                     onClick={() => setFilter('unsupported')}
                     type="button"
                   >
@@ -314,13 +313,13 @@ export function TypeFidelity() {
                 aria-hidden="true"
                 className="mt-0.5 h-4 w-4 shrink-0 text-warn/80"
               />
-              <p className="max-w-[75ch] text-[11.5px] leading-relaxed text-muted/80">
+              <p className="max-w-[75ch] text-caption leading-relaxed text-muted/80">
                 Views, triggers, PL/SQL, synonyms, grants, partitioning и
                 tablespaces не переносятся автоматически — это manual review.
               </p>
             </div>
             <button
-              className="shrink-0 rounded border border-line px-2.5 py-1.5 font-mono text-[9px] text-muted transition-colors hover:border-warn/40 hover:text-warn"
+              className="shrink-0 rounded border border-line px-2.5 py-1.5 font-mono text-micro text-muted transition-colors hover:border-warn/40 hover:text-warn"
               onClick={() => setFilter('unsupported')}
               type="button"
             >
@@ -330,7 +329,7 @@ export function TypeFidelity() {
         </>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[8.5px] text-muted/50">
+      <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-micro text-muted/70">
         <span className="max-w-full min-w-0 truncate">
           источник: {TYPE_MAPPING_SOURCE_PATH}
         </span>

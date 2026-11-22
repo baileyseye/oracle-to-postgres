@@ -80,10 +80,10 @@ function TableTicker({ completedTables, currentTable }: TableTickerProps) {
             key={table.name}
           >
             <span className="min-w-0">
-              <span className="block truncate font-mono text-[9px] text-text/75">
+              <span className="block truncate font-mono text-micro text-text/75">
                 {table.name}
               </span>
-              <span className="mt-0.5 block font-mono text-[8px] text-muted/60">
+              <span className="mt-0.5 block font-mono text-micro text-muted/80">
                 {formatCount(table.rows)} строк
               </span>
             </span>
@@ -165,17 +165,17 @@ export function SimulationPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <TrafficDots />
-          <span className="truncate font-mono text-[10px] text-muted">
+          <span className="truncate font-mono text-caption text-muted">
             async-job / simulation
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="rounded border border-magenta/25 bg-magenta/10 px-1.5 py-0.5 font-mono text-[8.5px] text-magenta">
+          <span className="rounded border border-magenta/25 bg-magenta/10 px-1.5 py-0.5 font-mono text-micro text-magenta">
             демо
           </span>
           <span
             className={cn(
-              'inline-flex items-center gap-1.5 font-mono text-[9px]',
+              'inline-flex items-center gap-1.5 font-mono text-micro',
               STATUS_COLOR[snapshot.status],
             )}
           >
@@ -187,17 +187,17 @@ export function SimulationPanel({
 
       <div className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-2 font-mono text-[9px] text-muted">
+          <span className="inline-flex items-center gap-2 font-mono text-micro text-muted">
             <Terminal aria-hidden="true" className="h-3.5 w-3.5" />
             initial-load
           </span>
-          <span className="rounded border border-line bg-bg/30 px-2 py-1 font-mono text-[8.5px] text-muted/80">
+          <span className="rounded border border-line bg-bg/30 px-2 py-1 font-mono text-micro text-muted/80">
             демо-симуляция фаз реального API
           </span>
         </div>
 
         {mode === 'mirror' ? (
-          <p className="mt-3 rounded-md border border-warn/20 bg-warn/5 px-3 py-2 text-[11px] leading-relaxed text-warn/85">
+          <p className="mt-3 rounded-md border border-warn/20 bg-warn/5 px-3 py-2 text-micro leading-relaxed text-warn/85">
             В разделе режимов выбран mirror. Эта симуляция фиксирована на
             initial-load — режиме по умолчанию.
           </p>
@@ -205,20 +205,20 @@ export function SimulationPanel({
 
         <div className="mt-4 grid grid-cols-3 gap-2">
           <div className="rounded-md border border-line bg-bg/30 px-2.5 py-2">
-            <div className="flex items-center gap-1.5 font-mono text-[8.5px] text-muted/70">
+            <div className="flex items-center gap-1.5 font-mono text-micro text-muted/70">
               <Gauge aria-hidden="true" className="h-3 w-3" />
               rows
             </div>
             <div className="mt-1 font-mono text-[13px] text-text">
               {formatCount(snapshot.rowsLoaded)}
-              <span className="text-muted/60">
+              <span className="text-muted/80">
                 {' '}
                 / {formatCount(snapshot.totalRows)}
               </span>
             </div>
           </div>
           <div className="rounded-md border border-line bg-bg/30 px-2.5 py-2">
-            <div className="flex items-center gap-1.5 font-mono text-[8.5px] text-muted/70">
+            <div className="flex items-center gap-1.5 font-mono text-micro text-muted/70">
               <Gauge aria-hidden="true" className="h-3 w-3" />
               rows/s
             </div>
@@ -227,7 +227,7 @@ export function SimulationPanel({
             </div>
           </div>
           <div className="rounded-md border border-line bg-bg/30 px-2.5 py-2">
-            <div className="flex items-center gap-1.5 font-mono text-[8.5px] text-muted/70">
+            <div className="flex items-center gap-1.5 font-mono text-micro text-muted/70">
               <Timer aria-hidden="true" className="h-3 w-3" />
               eta
             </div>
@@ -238,7 +238,7 @@ export function SimulationPanel({
         </div>
 
         <div className="mt-4">
-          <div className="mb-1.5 flex items-center justify-between gap-2 font-mono text-[9px] text-muted/70">
+          <div className="mb-1.5 flex items-center justify-between gap-2 font-mono text-micro text-muted/70">
             <span>progress</span>
             <span>{snapshot.progress}%</span>
           </div>
@@ -258,7 +258,7 @@ export function SimulationPanel({
         </div>
 
         <div className="mt-4">
-          <div className="mb-1.5 font-mono text-[9px] text-muted/70">
+          <div className="mb-1.5 font-mono text-micro text-muted/70">
             table ticker
           </div>
           <TableTicker
@@ -268,26 +268,26 @@ export function SimulationPanel({
         </div>
 
         <div className="mt-4 overflow-hidden rounded-lg border border-line bg-bg/70">
-          <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 font-mono text-[8.5px] text-muted/55">
+          <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5 font-mono text-micro text-muted/70">
             <span>stdout</span>
             <span>{snapshot.logs.length} строк</span>
           </div>
           <div
             aria-label="Консоль симуляции"
-            className="scroll-area min-h-[150px] max-h-[230px] overflow-y-auto px-3 py-2 font-mono text-[9.5px] leading-relaxed"
+            className="scroll-area min-h-[150px] max-h-[230px] overflow-y-auto px-3 py-2 font-mono text-micro leading-relaxed"
             ref={consoleRef}
             role="log"
             tabIndex={0}
           >
             {snapshot.logs.length === 0 ? (
-              <p className="text-muted/45">
+              <p className="text-muted/70">
                 $ нажмите «Запустить симуляцию» — шаги пойдут по реальному
                 пайплайну initial-load
               </p>
             ) : (
               snapshot.logs.map((log) => (
                 <p className="flex gap-2" key={log.id}>
-                  <span className="shrink-0 text-muted/35">
+                  <span className="shrink-0 text-muted/70">
                     [{formatElapsed(log.atMs)}]
                   </span>{' '}
                   <span className={LOG_COLOR[log.level]}>
@@ -303,10 +303,10 @@ export function SimulationPanel({
           <div className="mt-3 flex items-start gap-2.5 rounded-md border border-ok/30 bg-ok/5 px-3 py-2.5">
             <Check aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-ok" />
             <div>
-              <p className="font-mono text-[10px] text-ok">
+              <p className="font-mono text-caption text-ok">
                 VALIDATION PASSED
               </p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-muted/80">
+              <p className="mt-0.5 text-micro leading-relaxed text-muted/80">
                 Counts, агрегаты, nulls, orphan-FK и sequences совпали. Target
                 готов к cutover.
               </p>
@@ -346,7 +346,7 @@ export function SimulationPanel({
               <button
                 aria-pressed={snapshot.speed === speed}
                 className={cn(
-                  'rounded px-2 py-1 font-mono text-[9px] transition-colors',
+                  'rounded px-2 py-1 font-mono text-micro transition-colors',
                   snapshot.speed === speed
                     ? 'bg-surface-2 text-text'
                     : 'text-muted hover:text-text',
@@ -361,7 +361,7 @@ export function SimulationPanel({
           </div>
         </div>
 
-        <p className="mt-3 font-mono text-[8.5px] leading-relaxed text-muted/55">
+        <p className="mt-3 font-mono text-micro leading-relaxed text-muted/70">
           демо-набор: {formatCount(snapshot.totalRows)} строк · реальный job с
           phase/table/ETA подключается в LIVE
         </p>

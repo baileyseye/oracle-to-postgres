@@ -4,7 +4,6 @@ import { Why } from './sections/Why';
 import { Architecture } from './sections/Architecture';
 import { Pipeline } from './sections/Pipeline';
 import { Modes } from './sections/Modes';
-import { Code } from './sections/Code';
 import { Types } from './sections/Types';
 import { Api } from './sections/Api';
 import { Start } from './sections/Start';
@@ -35,7 +34,6 @@ export default function App() {
                 <Architecture />
                 <Pipeline />
                 <Modes />
-                <Code />
                 <Types />
                 <Api />
                 <Start />

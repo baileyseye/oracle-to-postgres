@@ -20,7 +20,7 @@ export function healthTextClass(status: ServiceHealthStatus): string {
     return 'text-electric';
   }
 
-  return 'text-muted/60';
+  return 'text-muted/80';
 }
 
 export function healthDotClass(status: ServiceHealthStatus): string {

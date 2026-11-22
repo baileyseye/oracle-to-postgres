@@ -17,6 +17,7 @@ import { ArchitecturePanel } from '../components/architecture/ArchitecturePanel'
 import { MigrationModeSwitch } from '../components/architecture/MigrationModeSwitch';
 import { SchemaOwnerSwitch } from '../components/architecture/SchemaOwnerSwitch';
 import { Reveal } from '../components/ui/Reveal';
+import { Container } from '../components/ui/Container';
 import { TrafficDots } from '../components/ui/TrafficDots';
 
 const DEFAULT_NODE: ArchitectureNodeId = 'module-migration';
@@ -57,9 +58,9 @@ export function Architecture() {
       className="relative py-24 sm:py-28"
       id="architecture"
     >
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between 2xl:gap-12">
             <div className="max-w-2xl">
               <h2 className="font-display text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold leading-[1.02] tracking-[-0.045em]">
                 Архитектура миграции
@@ -91,7 +92,7 @@ export function Architecture() {
               <div
                 aria-atomic="true"
                 aria-live="polite"
-                className="mt-2.5 rounded-lg border border-line bg-surface/40 px-3 py-2.5 font-mono text-[9.5px] leading-relaxed"
+                className="mt-2.5 rounded-lg border border-line bg-surface/40 px-3 py-2.5 font-mono text-micro leading-relaxed"
               >
                 <p className="flex items-start gap-2 text-text/85">
                   <span className="shrink-0 text-muted/70">1 · схема</span>{' '}
@@ -111,17 +112,17 @@ export function Architecture() {
         </Reveal>
 
         <Reveal delay={0.1}>
-          <div className="mt-10 grid gap-6 lg:grid-cols-12 lg:items-start">
+          <div className="mt-10 grid gap-6 lg:grid-cols-12 lg:items-start 2xl:gap-8">
             <div className="min-w-0 lg:col-span-8">
               <div className="panel min-w-0 overflow-hidden">
                 <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
                   <div className="flex min-w-0 items-center gap-3">
                     <TrafficDots />
-                    <span className="truncate font-mono text-[10px] text-muted">
+                    <span className="truncate font-mono text-caption text-muted">
                       топология / модули и схемы
                     </span>
                   </div>
-                  <span className="inline-flex shrink-0 items-center gap-2 font-mono text-[9.5px] text-muted">
+                  <span className="inline-flex shrink-0 items-center gap-2 font-mono text-micro text-muted">
                     <span
                       aria-hidden="true"
                       className="status-led text-electric"
@@ -130,7 +131,7 @@ export function Architecture() {
                   </span>
                   {runtimeMode === 'live' ? (
                     <span
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded border border-line bg-bg/30 px-1.5 py-0.5 font-mono text-[8px] text-muted/70"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded border border-line bg-bg/30 px-1.5 py-0.5 font-mono text-micro text-muted/70"
                       title="Состояние health модулей обновляется каждые 15 секунд"
                     >
                       <span
@@ -150,8 +151,8 @@ export function Architecture() {
                 </div>
 
                 <div className="p-3 sm:p-4">
-                  <div className="scroll-area max-w-full overflow-x-auto pb-1">
-                    <div className="w-[720px] min-w-[720px]">
+                  <div className="min-w-0 pb-1">
+                    <div className="mx-auto w-full max-w-[720px]">
                       <ArchitectureDiagram
                         onSelect={handleSelect}
                         schemaOwner={schemaOwner}
@@ -159,16 +160,13 @@ export function Architecture() {
                       />
                     </div>
                   </div>
-                  <div className="mt-3 flex flex-col gap-1.5 px-1 font-mono text-[9.5px] text-muted/75 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="mt-3 flex flex-col gap-1.5 px-1 font-mono text-micro text-muted/75 sm:flex-row sm:items-center sm:justify-between">
                     <span>Клик по узлу — детали</span>
-                    <span className="lg:hidden">
-                      Схему можно прокрутить по горизонтали
-                    </span>
                   </div>
                 </div>
 
                 <div className="border-t border-line px-4 py-3">
-                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-[9.5px] text-muted/80">
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-micro text-muted/80">
                     <span className="inline-flex items-center gap-2">
                       <span
                         aria-hidden="true"
@@ -198,7 +196,7 @@ export function Architecture() {
                       схемы / владение
                     </span>
                   </div>
-                  <p className="mt-2.5 text-[11px] leading-relaxed text-muted/80">
+                  <p className="mt-2.5 text-micro leading-relaxed text-muted/80">
                     <code className="font-mono text-text/80">public</code>{' '}
                     принадлежит Liquibase{' '}
                     <code className="font-mono text-text/80">
@@ -215,12 +213,12 @@ export function Architecture() {
               </div>
             </div>
 
-            <div className="min-w-0 lg:col-span-4 lg:sticky lg:top-[96px]">
+            <div className="min-w-0 lg:col-span-4 lg:sticky lg:top-[var(--sticky-top)]">
               <ArchitecturePanel node={selectedNode} schemaOwner={schemaOwner} />
             </div>
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }

@@ -39,7 +39,7 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
             <span
               aria-hidden="true"
               className={cn(
-                'absolute left-0 top-3.5 inline-flex h-7 w-7 items-center justify-center rounded-full border font-mono text-[9px]',
+                'absolute left-0 top-3.5 inline-flex h-7 w-7 items-center justify-center rounded-full border font-mono text-micro',
                 completed
                   ? 'border-ok/40 bg-ok/10 text-ok'
                   : running
@@ -76,16 +76,16 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
                   <span className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-[9px] text-muted/75">
+                        <span className="font-mono text-micro text-muted/75">
                           {step.kicker}
                         </span>
                         {step.optional ? (
-                          <span className="rounded border border-magenta/25 bg-magenta/10 px-1.5 py-0.5 font-mono text-[8px] text-magenta/90">
+                          <span className="rounded border border-magenta/25 bg-magenta/10 px-1.5 py-0.5 font-mono text-micro text-magenta/90">
                             optional
                           </span>
                         ) : null}
                         {running ? (
-                          <span className="inline-flex items-center gap-1.5 font-mono text-[8.5px] text-electric">
+                          <span className="inline-flex items-center gap-1.5 font-mono text-micro text-electric">
                             <span
                               aria-hidden="true"
                               className="status-led"
@@ -96,7 +96,7 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
                           </span>
                         ) : null}
                         {completed && !running ? (
-                          <span className="font-mono text-[8.5px] text-ok">
+                          <span className="font-mono text-micro text-ok">
                             готово
                           </span>
                         ) : null}
@@ -104,14 +104,14 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
                       <span className="mt-1 block font-display text-[15px] font-medium leading-snug text-text sm:text-base">
                         {step.title}
                       </span>
-                      <span className="mt-1 block text-[12px] leading-relaxed text-muted/80">
+                      <span className="mt-1 block text-caption leading-relaxed text-muted/80">
                         {step.summary}
                       </span>
                     </span>
                     <ChevronDown
                       aria-hidden="true"
                       className={cn(
-                        'mt-1 h-4 w-4 shrink-0 text-muted/60 transition-transform',
+                        'mt-1 h-4 w-4 shrink-0 text-muted/80 transition-transform',
                         open && 'rotate-180 text-text/80',
                       )}
                     />
@@ -127,7 +127,7 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
                   <ul className="space-y-1.5">
                     {step.details.map((detail) => (
                       <li
-                        className="flex gap-2.5 text-[12px] leading-relaxed text-muted/85"
+                        className="flex gap-2.5 text-caption leading-relaxed text-muted/85"
                         key={detail}
                       >
                         <span
@@ -140,7 +140,7 @@ export function PipelineStepper({ snapshot }: PipelineStepperProps) {
                   </ul>
 
                   <div className="mt-3 rounded-md border border-line/60 bg-bg/30 px-3 py-2">
-                    <p className="font-mono text-[9px] leading-relaxed text-muted/70">
+                    <p className="font-mono text-micro leading-relaxed text-muted/70">
                       <span className="text-text/70">важно: </span>
                       {step.note}
                     </p>

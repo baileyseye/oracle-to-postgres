@@ -21,25 +21,47 @@
   --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
+  --text-micro: 11px;
+  --text-micro--line-height: 1.45;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+
+  --container-shell: 1240px;
+
   --shadow-panel: 0 30px 80px -48px rgba(2, 6, 23, 0.95);
 }
 
 :root {
   color-scheme: dark;
   --nav-height: 72px;
+  --section-top-offset: calc(var(--nav-height) + 40px);
+  --section-top-offset-wide: calc(var(--nav-height) + 60px);
+  --sticky-top: calc(var(--nav-height) + 24px);
+  --notice-top: calc(var(--nav-height) + 12px);
   --gradient-migration: linear-gradient(
     100deg,
-    #c74634 0%,
-    #d946ef 30%,
-    #38bdf8 62%,
-    #336791 86%,
-    #336791 100%
+    var(--color-oracle) 0%,
+    var(--color-magenta) 30%,
+    var(--color-electric) 62%,
+    var(--color-pg) 86%,
+    var(--color-pg) 100%
   );
 }
 
+@media (min-width: 1536px) {
+  :root {
+    --container-shell: 1400px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 html {
-  scroll-behavior: smooth;
-  scroll-padding-top: calc(var(--nav-height) + 24px);
+  scroll-padding-top: var(--sticky-top);
   background-color: var(--color-bg);
   scrollbar-color: #334b6e var(--color-bg);
   scrollbar-width: thin;
@@ -372,10 +394,6 @@ footer[id] {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
-  }
-
   *,
   *::before,
   *::after {

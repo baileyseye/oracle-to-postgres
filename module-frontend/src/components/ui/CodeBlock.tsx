@@ -33,17 +33,17 @@ export function CodeBlock({
     <div className="overflow-hidden rounded-lg border border-line bg-bg/60">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface/55 px-3 py-2">
         <div className="min-w-0">
-          <div className="truncate font-mono text-[10px] text-text/85">
+          <div className="truncate font-mono text-caption text-text/85">
             {fileName}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[9px] text-muted/70">
+          <div className="mt-0.5 truncate font-mono text-micro text-muted/70">
             строки {startLine}–{endLine}
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button
             aria-label={copied ? 'Код скопирован' : 'Скопировать код'}
-            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface/70 px-2 font-mono text-[9px] text-muted transition-colors hover:border-electric/40 hover:text-text"
+            className="inline-flex h-7 items-center gap-1.5 rounded-md border border-line bg-surface/70 px-2 font-mono text-micro text-muted transition-colors hover:border-electric/40 hover:text-text"
             onClick={() => {
               void copy(code);
             }}
@@ -75,7 +75,7 @@ export function CodeBlock({
       <pre
         aria-label={`Код ${fileName}`}
         className={cn(
-          'scroll-area m-0 overflow-auto bg-bg/70 py-2 font-mono text-[10.5px] leading-[1.75]',
+          'scroll-area m-0 overflow-auto bg-bg/70 py-2 font-mono text-caption leading-[1.75]',
           maxHeightClass,
         )}
         tabIndex={0}
@@ -95,7 +95,7 @@ export function CodeBlock({
                   <span className="flex" key={lineIndex}>
                     <span
                       aria-hidden="true"
-                      className="sticky left-0 w-10 shrink-0 select-none border-r border-line/50 bg-bg/90 pr-2 text-right text-[9px] text-muted/40"
+                      className="sticky left-0 w-10 shrink-0 select-none border-r border-line/50 bg-bg/90 pr-2 text-right text-micro text-muted/70"
                     >
                       {startLine + lineIndex}
                     </span>
@@ -122,10 +122,10 @@ export function CodeBlock({
       </pre>
 
       <div className="flex items-center justify-between gap-3 border-t border-line px-3 py-1.5">
-        <span className="truncate font-mono text-[8.5px] text-muted/55">
+        <span className="truncate font-mono text-micro text-muted/70">
           {filePath}
         </span>
-        <span className="shrink-0 font-mono text-[8.5px] text-muted/55">
+        <span className="shrink-0 font-mono text-micro text-muted/70">
           {language}
         </span>
       </div>

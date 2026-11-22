@@ -72,21 +72,21 @@ function ResourceCard({
     <article className="min-w-0 rounded-lg border border-line bg-bg/25 p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h4 className="font-mono text-[10px] text-text/85">{title}</h4>
-          <p className="mt-0.5 font-mono text-[8px] text-muted/50">
+          <h4 className="font-mono text-caption text-text/85">{title}</h4>
+          <p className="mt-0.5 font-mono text-micro text-muted/70">
             {service}
           </p>
         </div>
         <span
           className={cn(
-            'shrink-0 rounded border px-1.5 py-0.5 font-mono text-[8px]',
+            'shrink-0 rounded border px-1.5 py-0.5 font-mono text-micro',
             status === 'ready'
               ? 'border-ok/25 bg-ok/10 text-ok'
               : status === 'loading'
                 ? 'border-electric/25 bg-electric/10 text-electric'
                 : offline
                   ? 'border-warn/25 bg-warn/10 text-warn'
-                  : 'border-line bg-surface/50 text-muted/55',
+                  : 'border-line bg-surface/50 text-muted/70',
           )}
         >
           {RESOURCE_LABEL[status]}
@@ -95,13 +95,13 @@ function ResourceCard({
 
       <div className="mt-3">
         {status === 'loading' ? (
-          <p className="mb-2 font-mono text-[8.5px] text-electric/65">
+          <p className="mb-2 font-mono text-micro text-electric/65">
             обновление…
           </p>
         ) : null}
         {offline ? (
           <div className="rounded border border-warn/20 bg-warn/5 px-2.5 py-2">
-            <p className="flex items-start gap-1.5 text-[10.5px] leading-relaxed text-warn/85">
+            <p className="flex items-start gap-1.5 text-caption leading-relaxed text-warn/85">
               <WifiOff
                 aria-hidden="true"
                 className="mt-0.5 h-3.5 w-3.5 shrink-0"
@@ -109,7 +109,7 @@ function ResourceCard({
               {error ?? 'Сервис недоступен'}
             </p>
             <button
-              className="mt-2 inline-flex items-center gap-1 font-mono text-[8.5px] text-muted hover:text-text"
+              className="mt-2 inline-flex items-center gap-1 font-mono text-micro text-muted hover:text-text"
               onClick={onRetry}
               type="button"
             >
@@ -123,7 +123,7 @@ function ResourceCard({
       </div>
 
       {updatedAt ? (
-        <p className="mt-2 border-t border-line/60 pt-1.5 font-mono text-[8px] text-muted/35">
+        <p className="mt-2 border-t border-line/60 pt-1.5 font-mono text-micro text-muted/70">
           updated {formatCheckedAt(updatedAt)}
         </p>
       ) : null}
@@ -142,10 +142,10 @@ function Metric({
 }) {
   return (
     <div>
-      <dt className="font-mono text-[8px] text-muted/50">{label}</dt>
+      <dt className="font-mono text-micro text-muted/70">{label}</dt>
       <dd
         className={cn(
-          'mt-0.5 font-mono text-[10px]',
+          'mt-0.5 font-mono text-caption',
           tone === 'ok'
             ? 'text-ok'
             : tone === 'warn'
@@ -170,7 +170,7 @@ function ActionSummary() {
     return (
       <div className="mt-3 flex items-center gap-2 rounded border border-electric/20 bg-electric/5 px-3 py-2">
         <span className="status-led text-electric" />
-        <p className="font-mono text-[9.5px] text-electric">
+        <p className="font-mono text-micro text-electric">
           выполняется {action.kind ?? 'операция'}…
         </p>
       </div>
@@ -183,7 +183,7 @@ function ActionSummary() {
         className="mt-3 rounded border border-danger/25 bg-danger/5 px-3 py-2"
         role="alert"
       >
-        <p className="text-[11px] leading-relaxed text-danger/85">
+        <p className="text-micro leading-relaxed text-danger/85">
           {action.error}
         </p>
       </div>
@@ -195,7 +195,7 @@ function ActionSummary() {
 
     return (
       <div className="mt-3 rounded border border-ok/20 bg-ok/5 px-3 py-2.5">
-        <p className="font-mono text-[9px] text-ok">
+        <p className="font-mono text-micro text-ok">
           migration report · {report.mode}
         </p>
         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2">
@@ -250,7 +250,7 @@ function ActionSummary() {
       >
         <p
           className={cn(
-            'font-mono text-[9px]',
+            'font-mono text-micro',
             report.success ? 'text-ok' : 'text-warn',
           )}
         >
@@ -270,7 +270,7 @@ function ActionSummary() {
           <ul className="mt-2 space-y-1">
             {report.warnings.slice(0, 3).map((warning) => (
               <li
-                className="font-mono text-[8.5px] leading-relaxed text-warn/75"
+                className="font-mono text-micro leading-relaxed text-warn/75"
                 key={warning}
               >
                 {warning}
@@ -402,7 +402,7 @@ function LiveConsoleContent() {
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <div className="flex min-w-0 items-center gap-3">
             <TrafficDots />
-            <span className="truncate font-mono text-[10px] text-muted">
+            <span className="truncate font-mono text-caption text-muted">
               LIVE-консоль
             </span>
           </div>
@@ -422,27 +422,27 @@ function LiveConsoleContent() {
                   интерфейс автоматически вернётся в DEMO.
                 </p>
               </div>
-              <span className="rounded border border-line bg-bg/30 px-2 py-1 font-mono text-[8.5px] text-muted/55">
+              <span className="rounded border border-line bg-bg/30 px-2 py-1 font-mono text-micro text-muted/70">
                 Vite proxy · /api/*
               </span>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-4">
               {LIVE_SERVICES.map((service) => (
                 <div className="bg-bg/65 px-3 py-2.5" key={service.id}>
-                  <div className="flex items-center gap-1.5 font-mono text-[8.5px] text-text/70">
+                  <div className="flex items-center gap-1.5 font-mono text-micro text-text/70">
                     <span
                       aria-hidden="true"
                       className="h-1.5 w-1.5 rounded-full bg-muted/30"
                     />
                     {service.name}
                   </div>
-                  <p className="mt-1 font-mono text-[8px] text-muted/45">
+                  <p className="mt-1 font-mono text-micro text-muted/70">
                     :{service.port} · не проверен
                   </p>
                 </div>
               ))}
             </div>
-            <p className="mt-4 font-mono text-[9px] leading-relaxed text-muted/45">
+            <p className="mt-4 font-mono text-micro leading-relaxed text-muted/70">
               Base URL: VITE_ORACLE_BASE, VITE_POSTGRES_BASE,
               VITE_MIGRATION_BASE, VITE_SCHEMA_BASE. По умолчанию — alias
               /api/oracle, /api/postgres, /api/migration, /api/schema.
@@ -452,15 +452,15 @@ function LiveConsoleContent() {
           <div className="space-y-4 p-4 sm:p-5">
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-mono text-[10px] text-muted/70">
+                <h3 className="font-mono text-caption text-muted/70">
                   health · 4 сервиса
                 </h3>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-[8px] text-muted/40">
+                  <span className="font-mono text-micro text-muted/70">
                     checked {formatCheckedAt(lastHealthCheckedAt)}
                   </span>
                   <button
-                    className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-1 font-mono text-[8px] text-muted hover:text-text"
+                    className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-1 font-mono text-micro text-muted hover:text-text"
                     onClick={refreshHealth}
                     type="button"
                   >
@@ -477,7 +477,7 @@ function LiveConsoleContent() {
                     title={service.error ?? undefined}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[8.5px] text-text/70">
+                      <span className="truncate font-mono text-micro text-text/70">
                         {service.name}
                       </span>
                       <span
@@ -488,8 +488,8 @@ function LiveConsoleContent() {
                         )}
                       />
                     </div>
-                    <div className="mt-1 flex items-center justify-between gap-2 font-mono text-[8px]">
-                      <span className="text-muted/45">:{service.port}</span>
+                    <div className="mt-1 flex items-center justify-between gap-2 font-mono text-micro">
+                      <span className="text-muted/70">:{service.port}</span>
                       <span className={healthTextClass(service.status)}>
                         {HEALTH_LABEL[service.status]}
                         {service.latencyMs !== null
@@ -500,7 +500,7 @@ function LiveConsoleContent() {
                   </div>
                 ))}
               </div>
-              <p className="mt-1.5 font-mono text-[8px] text-muted/35">
+              <p className="mt-1.5 font-mono text-micro text-muted/70">
                 health: {healthSummary.status} · {healthSummary.up}/
                 {healthSummary.total}
               </p>
@@ -508,11 +508,11 @@ function LiveConsoleContent() {
 
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-mono text-[10px] text-muted/70">
+                <h3 className="font-mono text-caption text-muted/70">
                   read-only статус
                 </h3>
                 <button
-                  className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-1 font-mono text-[8px] text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 rounded border border-line px-1.5 py-1 font-mono text-micro text-muted hover:text-text"
                   onClick={refreshData}
                   type="button"
                 >
@@ -564,7 +564,7 @@ function LiveConsoleContent() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span
                           className={cn(
-                            'rounded border px-1.5 py-0.5 font-mono text-[8.5px]',
+                            'rounded border px-1.5 py-0.5 font-mono text-micro',
                             schemaDiff.valid
                               ? 'border-ok/25 bg-ok/10 text-ok'
                               : 'border-danger/25 bg-danger/10 text-danger',
@@ -572,7 +572,7 @@ function LiveConsoleContent() {
                         >
                           {schemaDiff.valid ? 'valid' : 'invalid'}
                         </span>
-                        <span className="font-mono text-[8px] text-muted/50">
+                        <span className="font-mono text-micro text-muted/70">
                           {schemaDiff.sourceSchema} → {schemaDiff.targetSchema}
                         </span>
                       </div>
@@ -617,7 +617,7 @@ function LiveConsoleContent() {
                       <div className="flex flex-wrap items-center gap-2">
                         <span
                           className={cn(
-                            'rounded border px-1.5 py-0.5 font-mono text-[8.5px]',
+                            'rounded border px-1.5 py-0.5 font-mono text-micro',
                             schemaStatus.valid
                               ? 'border-ok/25 bg-ok/10 text-ok'
                               : 'border-warn/25 bg-warn/10 text-warn',
@@ -625,7 +625,7 @@ function LiveConsoleContent() {
                         >
                           {schemaStatus.valid ? 'valid' : 'review'}
                         </span>
-                        <span className="font-mono text-[8px] text-muted/50">
+                        <span className="font-mono text-micro text-muted/70">
                           {schemaStatus.targetExists ? 'target exists' : 'no target'}
                         </span>
                       </div>
@@ -662,14 +662,14 @@ function LiveConsoleContent() {
                     <div className="flex flex-wrap gap-1">
                       {tables.slice(0, 12).map((table) => (
                         <code
-                          className="rounded border border-line bg-surface/50 px-1.5 py-0.5 font-mono text-[8.5px] text-text/70"
+                          className="rounded border border-line bg-surface/50 px-1.5 py-0.5 font-mono text-micro text-text/70"
                           key={table}
                         >
                           {table}
                         </code>
                       ))}
                       {tables.length > 12 ? (
-                        <span className="font-mono text-[8.5px] text-muted/50">
+                        <span className="font-mono text-micro text-muted/70">
                           +{tables.length - 12}
                         </span>
                       ) : null}
@@ -683,19 +683,19 @@ function LiveConsoleContent() {
               <div className="rounded-lg border border-electric/25 bg-electric/[0.035] p-3.5">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h3 className="inline-flex items-center gap-2 font-mono text-[10px] text-electric/90">
+                    <h3 className="inline-flex items-center gap-2 font-mono text-caption text-electric/90">
                       <Database aria-hidden="true" className="h-3.5 w-3.5" />
                       demo dataset
-                      <span className="rounded border border-electric/25 bg-electric/10 px-1.5 py-0.5 text-[8px]">
+                      <span className="rounded border border-electric/25 bg-electric/10 px-1.5 py-0.5 text-micro">
                         dev only
                       </span>
                     </h3>
-                    <p className="mt-1 max-w-[75ch] text-[11px] leading-relaxed text-muted/75">
+                    <p className="mt-1 max-w-[75ch] text-micro leading-relaxed text-muted/75">
                       Заполняет Oracle до 2 000 000 users и 4 000 000 orders.
                       Target-схема не меняется; данные нужны для проверки
                       миграции.
                     </p>
-                    <p className="mt-2 font-mono text-[9px] text-muted/50">
+                    <p className="mt-2 font-mono text-micro text-muted/70">
                       source сейчас:{' '}
                       {migrationStatus
                         ? `${formatCount(migrationStatus.sourceUsers)} users / ${formatCount(migrationStatus.sourceOrders)} orders`
@@ -703,7 +703,7 @@ function LiveConsoleContent() {
                     </p>
                   </div>
                   <button
-                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded border border-electric/30 bg-electric/10 px-2.5 font-mono text-[9px] text-electric transition-colors hover:bg-electric/15 disabled:cursor-not-allowed disabled:opacity-35"
+                    className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded border border-electric/30 bg-electric/10 px-2.5 font-mono text-micro text-electric transition-colors hover:bg-electric/15 disabled:cursor-not-allowed disabled:opacity-35"
                     disabled={
                       seedState.running || actionsBlocked || jobRunning
                     }
@@ -732,7 +732,7 @@ function LiveConsoleContent() {
                 </div>
 
                 {seedState.running ? (
-                  <p className="mt-2 font-mono text-[8.5px] text-electric/70">
+                  <p className="mt-2 font-mono text-micro text-electric/70">
                     выполняется локальный seed-скрипт; это может занять до
                     нескольких минут
                   </p>
@@ -743,11 +743,11 @@ function LiveConsoleContent() {
                     className="mt-3 rounded border border-danger/25 bg-danger/5 px-3 py-2"
                     role="alert"
                   >
-                    <p className="text-[11px] leading-relaxed text-danger/85">
+                    <p className="text-micro leading-relaxed text-danger/85">
                       {seedState.error}
                     </p>
                     {seedState.output ? (
-                      <pre className="scroll-area mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-[8.5px] leading-relaxed text-danger/75">
+                      <pre className="scroll-area mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono text-micro leading-relaxed text-danger/75">
                         {seedState.output.slice(-1600)}
                       </pre>
                     ) : null}
@@ -757,7 +757,7 @@ function LiveConsoleContent() {
                 {seedState.completedAt &&
                 !seedState.running &&
                 !seedState.error ? (
-                  <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-[8.5px] text-ok">
+                  <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-micro text-ok">
                     <Check aria-hidden="true" className="h-3 w-3" />
                     seed завершён · counts обновятся автоматически
                   </p>
@@ -768,20 +768,20 @@ function LiveConsoleContent() {
             <div className="rounded-lg border border-danger/25 bg-danger/[0.035] p-3.5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h3 className="inline-flex items-center gap-2 font-mono text-[10px] text-danger/90">
+                  <h3 className="inline-flex items-center gap-2 font-mono text-caption text-danger/90">
                     <Shield aria-hidden="true" className="h-3.5 w-3.5" />
                     изменяющие операции
                   </h3>
-                  <p className="mt-1 max-w-[75ch] text-[11px] leading-relaxed text-muted/75">
+                  <p className="mt-1 max-w-[75ch] text-micro leading-relaxed text-muted/75">
                     По умолчанию заблокированы. Включите armed-режим и
                     подтвердите каждую операцию словом MIGRATE. Это реально
                     меняет PostgreSQL.
                   </p>
                 </div>
-                <label className="inline-flex w-full shrink-0 cursor-pointer items-start gap-2 rounded-md border border-line bg-bg/40 px-2.5 py-2 font-mono text-[9px] text-muted sm:w-auto">
+                <label className="inline-flex w-full shrink-0 cursor-pointer items-start gap-2 rounded-md border border-line bg-bg/40 px-2.5 py-2 font-mono text-micro text-muted sm:w-auto">
                   <input
                     checked={armed}
-                    className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-[#f87171]"
+                    className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-danger"
                     onChange={(event) => setArmed(event.target.checked)}
                     type="checkbox"
                   />
@@ -791,8 +791,8 @@ function LiveConsoleContent() {
                     </span>
                     <span
                       className={cn(
-                        'mt-0.5 block text-[8px]',
-                        armed ? 'text-danger' : 'text-muted/45',
+                        'mt-0.5 block text-micro',
+                        armed ? 'text-danger' : 'text-muted/70',
                       )}
                     >
                       {armed ? 'armed · кнопки активны' : 'locked · кнопки заблокированы'}
@@ -803,7 +803,7 @@ function LiveConsoleContent() {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
-                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-[9px] text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-micro text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
                   disabled={
                     !armed || actionsBlocked || !migrationUp || jobRunning
                   }
@@ -823,7 +823,7 @@ function LiveConsoleContent() {
                   initial-load sync
                 </button>
                 <button
-                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-[9px] text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-micro text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
                   disabled={
                     !armed ||
                     actionsBlocked ||
@@ -846,7 +846,7 @@ function LiveConsoleContent() {
                   initial-load async
                 </button>
                 <button
-                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-[9px] text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
+                  className="inline-flex h-8 items-center gap-1.5 rounded border border-danger/30 bg-danger/10 px-2.5 font-mono text-micro text-danger transition-colors hover:bg-danger/15 disabled:cursor-not-allowed disabled:opacity-35"
                   disabled={!armed || actionsBlocked || !schemaUp}
                   onClick={() => setPendingAction('apply')}
                   title={
@@ -864,19 +864,19 @@ function LiveConsoleContent() {
               </div>
 
               {!armed ? (
-                <p className="mt-2 flex items-center gap-1.5 font-mono text-[8.5px] text-muted/45">
+                <p className="mt-2 flex items-center gap-1.5 font-mono text-micro text-muted/70">
                   <Ban aria-hidden="true" className="h-3 w-3" />
                   кнопки заблокированы до изменения armed-режима
                 </p>
               ) : null}
               {!migrationUp || !schemaUp ? (
-                <p className="mt-2 font-mono text-[8.5px] text-warn/65">
+                <p className="mt-2 font-mono text-micro text-warn/65">
                   Часть операций недоступна: {!migrationUp ? '8083 down. ' : ''}
                   {!schemaUp ? '8084 down.' : ''}
                 </p>
               ) : null}
               {jobRunning ? (
-                <p className="mt-2 font-mono text-[8.5px] text-warn/65">
+                <p className="mt-2 font-mono text-micro text-warn/65">
                   Активный async job уже выполняется; второй запуск получит 409.
                 </p>
               ) : null}
@@ -884,7 +884,7 @@ function LiveConsoleContent() {
               <ActionSummary />
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[8px] text-muted/35">
+            <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-micro text-muted/70">
               <span>
                 <Check aria-hidden="true" className="mr-1 inline h-3 w-3 text-ok" />
                 polling: health 15s · status 20s

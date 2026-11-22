@@ -12,7 +12,7 @@ export function MigrationModeSwitch({ label }: MigrationModeSwitchProps) {
   return (
     <div className="flex w-full flex-col gap-1 rounded-xl border border-line bg-surface/55 p-1 sm:flex-row sm:items-center">
       {label ? (
-        <span className="shrink-0 px-2 font-mono text-[9px] text-muted/80">
+        <span className="shrink-0 px-2 font-mono text-micro text-muted/80">
           {label}
         </span>
       ) : null}
@@ -43,16 +43,16 @@ export function MigrationModeSwitch({ label }: MigrationModeSwitchProps) {
                   aria-hidden="true"
                   className={cn(
                     'status-led',
-                    active ? 'text-electric' : 'text-muted/50',
+                    active ? 'text-electric' : 'text-muted/70',
                   )}
                 />
-                <span className="font-mono text-[11px] whitespace-nowrap">
+                <span className="font-mono text-micro whitespace-nowrap">
                   {option.label}
                 </span>
               </span>
               <span
                 className={cn(
-                  'whitespace-nowrap text-[10px]',
+                  'whitespace-nowrap text-caption',
                   active ? 'text-text/70' : 'text-muted/70',
                 )}
               >

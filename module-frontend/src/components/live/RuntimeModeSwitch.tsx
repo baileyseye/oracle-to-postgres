@@ -36,8 +36,8 @@ export function RuntimeModeSwitch({
         className={cn(
           'inline-flex items-center gap-1.5 rounded font-mono transition-colors',
           size === 'sm'
-            ? 'px-1.5 py-1 text-[8.5px]'
-            : 'px-3 py-2 text-[10px]',
+            ? 'px-1.5 py-1 text-micro'
+            : 'px-3 py-2 text-caption',
           mode === 'demo'
             ? 'bg-surface-2 text-text'
             : 'text-muted hover:text-text',
@@ -60,8 +60,8 @@ export function RuntimeModeSwitch({
         className={cn(
           'inline-flex items-center gap-1.5 rounded font-mono transition-colors',
           size === 'sm'
-            ? 'px-1.5 py-1 text-[8.5px]'
-            : 'px-3 py-2 text-[10px]',
+            ? 'px-1.5 py-1 text-micro'
+            : 'px-3 py-2 text-caption',
           mode === 'live'
             ? 'bg-surface-2 text-text'
             : 'text-muted hover:text-text',

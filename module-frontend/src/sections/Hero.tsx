@@ -1,7 +1,8 @@
 import type { Variants } from 'framer-motion';
 import { motion } from 'framer-motion';
-import { ArrowDown, ArrowUpRight, CodeXml } from 'lucide-react';
+import { ArrowDown, ArrowUpRight } from 'lucide-react';
 import { HERO_STATS, SITE } from '../data/site';
+import { Container } from '../components/ui/Container';
 import { GithubIcon } from '../components/ui/GithubIcon';
 import { SchemaFlow } from '../components/hero/SchemaFlow';
 import { TelemetryRail } from '../components/hero/TelemetryRail';
@@ -36,17 +37,17 @@ function InlineCode({ children }: { readonly children: string }) {
 export function Hero() {
   return (
     <section
-      className="relative overflow-x-clip pb-20 pt-[112px] sm:pb-24 sm:pt-[132px]"
+      className="relative overflow-x-clip pb-20 pt-[var(--section-top-offset)] sm:pb-24 sm:pt-[var(--section-top-offset-wide)]"
       id="top"
     >
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <motion.div
           animate="show"
           initial="hidden"
           variants={HERO_CONTAINER}
         >
           <motion.div variants={HERO_ITEM}>
-            <div className="inline-flex items-center gap-2.5 rounded-md border border-line bg-surface/55 px-3 py-1.5 font-mono text-[10px] text-muted backdrop-blur">
+            <div className="inline-flex items-center gap-2.5 rounded-md border border-line bg-surface/55 px-3 py-1.5 font-mono text-caption text-muted backdrop-blur">
               <span aria-hidden="true" className="status-led text-ok" />
               <span className="text-text/85">initial-load</span>
               <span aria-hidden="true" className="h-3 w-px bg-line" />
@@ -65,7 +66,7 @@ export function Hero() {
             </h1>
           </motion.div>
 
-          <div className="mt-9 grid gap-12 lg:mt-12 lg:grid-cols-12 lg:gap-10">
+          <div className="mt-9 grid gap-12 lg:mt-12 lg:grid-cols-12 lg:gap-10 2xl:gap-14">
             <motion.div className="lg:col-span-6 lg:pr-6" variants={HERO_ITEM}>
               <p className="max-w-[58ch] text-[15px] leading-7 text-muted sm:text-base">
                 <InlineCode>initial-load</InlineCode> — режим по умолчанию:
@@ -87,16 +88,6 @@ export function Hero() {
                   />
                 </a>
                 <a
-                  className="group inline-flex h-12 items-center gap-2 rounded-lg border border-line bg-surface/70 px-5 text-sm font-medium text-text transition-colors hover:border-electric/40 hover:bg-surface-2/80"
-                  href="#code"
-                >
-                  <CodeXml
-                    aria-hidden="true"
-                    className="h-4 w-4 text-muted transition-colors group-hover:text-electric"
-                  />
-                  Код
-                </a>
-                <a
                   className="group inline-flex h-12 items-center gap-2 px-2 text-sm text-muted transition-colors hover:text-text"
                   href={SITE.repoUrl}
                   rel="noreferrer"
@@ -111,7 +102,7 @@ export function Hero() {
                 </a>
               </div>
 
-              <p className="mt-7 flex items-start gap-2.5 font-mono text-[10px] leading-relaxed text-muted/80">
+              <p className="mt-7 flex items-start gap-2.5 font-mono text-caption leading-relaxed text-muted/80">
                 <span
                   aria-hidden="true"
                   className="mt-[5px] h-1 w-1 shrink-0 rounded-full bg-electric"
@@ -126,7 +117,7 @@ export function Hero() {
             </motion.div>
           </div>
         </motion.div>
-      </div>
+      </Container>
 
       <TelemetryRail stats={HERO_STATS} />
     </section>

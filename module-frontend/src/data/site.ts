@@ -16,7 +16,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'architecture', label: 'Архитектура' },
   { id: 'pipeline', label: 'Пайплайн' },
   { id: 'modes', label: 'Режимы' },
-  { id: 'code', label: 'Код' },
   { id: 'types', label: 'Типы' },
   { id: 'api', label: 'API' },
   { id: 'start', label: 'Старт' },

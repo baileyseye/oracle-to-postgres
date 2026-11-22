@@ -115,7 +115,7 @@ export function ArchitecturePanel({
           <div className="flex flex-wrap items-center justify-end gap-2">
             {modeBadge ? (
               <span
-                className="rounded border px-1.5 py-0.5 font-mono text-[9px]"
+                className="rounded border px-1.5 py-0.5 font-mono text-micro"
                 style={{
                   borderColor: ACCENT_BORDER[node.accent],
                   color: accent,
@@ -125,14 +125,14 @@ export function ArchitecturePanel({
               </span>
             ) : null}
             {node.port ? (
-              <span className="rounded border border-line bg-bg/40 px-1.5 py-0.5 font-mono text-[9px] text-muted">
+              <span className="rounded border border-line bg-bg/40 px-1.5 py-0.5 font-mono text-micro text-muted">
                 :{node.port}
               </span>
             ) : null}
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-2 font-mono text-[9.5px] text-muted">
+        <div className="mt-4 flex items-center gap-2 font-mono text-micro text-muted">
           <span
             aria-hidden="true"
             className="h-1.5 w-1.5 rounded-full"
@@ -143,14 +143,14 @@ export function ArchitecturePanel({
         <h3 className="mt-1.5 break-words font-mono text-[17px] leading-snug text-text">
           {node.title}
         </h3>
-        <p className="mt-1 font-mono text-[11px] text-muted">{node.subtitle}</p>
+        <p className="mt-1 font-mono text-micro text-muted">{node.subtitle}</p>
 
         {serviceHealth ? (
           <div
-            className="mt-3 flex items-center justify-between gap-3 rounded-md border border-line bg-bg/30 px-2.5 py-1.5 font-mono text-[9px]"
+            className="mt-3 flex items-center justify-between gap-3 rounded-md border border-line bg-bg/30 px-2.5 py-1.5 font-mono text-micro"
             title={serviceHealth.error ?? undefined}
           >
-            <span className="inline-flex items-center gap-2 text-muted/65">
+            <span className="inline-flex items-center gap-2 text-muted/80">
               <span
                 aria-hidden="true"
                 className={cn(
@@ -175,7 +175,7 @@ export function ArchitecturePanel({
 
         {schemaNote ? (
           <div className="mt-4 rounded-md border border-electric/20 bg-electric/5 p-3">
-            <p className="font-mono text-[9.5px] text-electric/80">
+            <p className="font-mono text-micro text-electric/80">
               {schemaNoteLabel}
             </p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-text/80">
@@ -185,7 +185,7 @@ export function ArchitecturePanel({
         ) : null}
 
         {node.apiPrefix ? (
-          <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-line bg-bg/35 px-3 py-2 font-mono text-[10px]">
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-line bg-bg/35 px-3 py-2 font-mono text-caption">
             <span className="text-muted/80">API</span>
             <span className="truncate text-text/90">{node.apiPrefix}</span>
           </div>
@@ -193,7 +193,7 @@ export function ArchitecturePanel({
 
         {modeNote ? (
           <div className="mt-4 rounded-md border border-line bg-surface/45 p-3">
-            <p className="font-mono text-[9.5px] text-muted/80">
+            <p className="font-mono text-micro text-muted/80">
               в режиме {mode}
             </p>
             <p className="mt-1.5 text-[12.5px] leading-relaxed text-text/80">
@@ -203,14 +203,14 @@ export function ArchitecturePanel({
         ) : null}
 
         <div className="mt-5 border-t border-line pt-4">
-          <p className="font-mono text-[9.5px] text-muted/80">
+          <p className="font-mono text-micro text-muted/80">
             {node.keyItemsLabel}
           </p>
           <ul className="mt-2 space-y-1">
             {node.keyItems.map((item) => (
               <li key={item.name}>
                 <a
-                  className="group flex max-w-full items-start gap-1.5 py-0.5 font-mono text-[11px] text-muted transition-colors hover:text-text"
+                  className="group flex max-w-full items-start gap-1.5 py-0.5 font-mono text-micro text-muted transition-colors hover:text-text"
                   href={item.href}
                   rel="noreferrer"
                   target="_blank"
@@ -218,7 +218,7 @@ export function ArchitecturePanel({
                   <span className="min-w-0 break-words">{item.name}</span>
                   <ArrowUpRight
                     aria-hidden="true"
-                    className="mt-0.5 h-3 w-3 shrink-0 text-muted/60 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                    className="mt-0.5 h-3 w-3 shrink-0 text-muted/80 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
                   />
                 </a>
               </li>

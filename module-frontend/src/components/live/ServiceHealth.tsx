@@ -33,14 +33,14 @@ export function ServiceHealthStrip({ className }: ServiceHealthStripProps) {
     >
       <span
         className={cn(
-          'hidden font-mono text-[8px] sm:inline',
+          'hidden font-mono text-micro sm:inline',
           healthSummary.status === 'up'
             ? 'text-ok'
             : healthSummary.status === 'degraded'
               ? 'text-warn'
               : healthSummary.status === 'down'
                 ? 'text-danger'
-                : 'text-muted/60',
+                : 'text-muted/80',
         )}
       >
         {healthSummary.up}/{healthSummary.total}
@@ -78,7 +78,7 @@ export function ServiceHealthList({
 
   if (mode !== 'live') {
     return (
-      <p className="font-mono text-[9px] leading-relaxed text-muted/55">
+      <p className="font-mono text-micro leading-relaxed text-muted/70">
         DEMO работает без бэкенда. LIVE подключается к 8081–8084.
       </p>
     );
@@ -101,13 +101,13 @@ export function ServiceHealthList({
                 healthDotClass(service.status),
               )}
             />
-            <span className="truncate font-mono text-[9px] text-text/75">
+            <span className="truncate font-mono text-micro text-text/75">
               {service.name}
             </span>
           </span>
           <span
             className={cn(
-              'shrink-0 font-mono text-[8px]',
+              'shrink-0 font-mono text-micro',
               healthTextClass(service.status),
             )}
           >
@@ -116,7 +116,7 @@ export function ServiceHealthList({
           </span>
         </div>
       ))}
-      <p className="pt-1 font-mono text-[8px] text-muted/45">
+      <p className="pt-1 font-mono text-micro text-muted/70">
         checked {formatCheckedAt(lastHealthCheckedAt)}
       </p>
     </div>

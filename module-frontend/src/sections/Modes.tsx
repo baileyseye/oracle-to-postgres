@@ -3,16 +3,18 @@ import { MODE_CARDS, MODE_COMPARISON } from '../data/modes';
 import { useMigrationMode } from '../hooks/useMigrationMode';
 import { cn } from '../lib/cn';
 import { MigrationModeSwitch } from '../components/architecture/MigrationModeSwitch';
+import { Container } from '../components/ui/Container';
 import { Reveal } from '../components/ui/Reveal';
+import { ScrollFade } from '../components/ui/ScrollFade';
 
 export function Modes() {
   const { mode } = useMigrationMode();
 
   return (
     <section className="relative py-24 sm:py-28" id="modes">
-      <div className="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+      <Container>
         <Reveal>
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between 2xl:gap-8">
             <div className="max-w-2xl">
               <h2 className="font-display text-[clamp(2.1rem,4.6vw,3.9rem)] font-semibold leading-[1.02] tracking-[-0.045em]">
                 Два режима переноса
@@ -30,7 +32,7 @@ export function Modes() {
         </Reveal>
 
         <Reveal delay={0.08}>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
+          <div className="mt-10 grid gap-4 md:grid-cols-2 2xl:gap-5">
             {MODE_CARDS.map((card) => {
               const active = card.id === mode;
 
@@ -56,16 +58,16 @@ export function Modes() {
                         aria-hidden="true"
                         className={cn(
                           'status-led',
-                          active ? 'text-electric' : 'text-muted/40',
+                          active ? 'text-electric' : 'text-muted/70',
                         )}
                       />
-                      <span className="font-mono text-[12px] text-text">
+                      <span className="font-mono text-caption text-text">
                         {card.title}
                       </span>
                     </div>
                     <span
                       className={cn(
-                        'rounded border px-1.5 py-0.5 font-mono text-[8.5px]',
+                        'rounded border px-1.5 py-0.5 font-mono text-micro',
                         active
                           ? 'border-electric/30 bg-electric/10 text-electric'
                           : 'border-line bg-surface/50 text-muted/70',
@@ -80,7 +82,7 @@ export function Modes() {
                   <ul className="mt-4 grid gap-1.5 sm:grid-cols-2">
                     {card.facts.map((fact) => (
                       <li
-                        className="flex items-start gap-2 font-mono text-[9.5px] leading-relaxed text-muted/75"
+                        className="flex items-start gap-2 font-mono text-micro leading-relaxed text-muted/75"
                         key={fact}
                       >
                         <span
@@ -100,24 +102,22 @@ export function Modes() {
           </div>
 
           <div className="panel mt-4 overflow-hidden">
-            <div
+            <ScrollFade
               aria-label="Сравнение режимов"
-              className="scroll-area overflow-x-auto"
-              role="region"
-              tabIndex={0}
+              className="overflow-x-auto"
             >
               <table className="w-full min-w-[760px] border-collapse text-left">
                 <thead>
                   <tr className="border-b border-line">
                     <th
-                      className="w-[26%] px-4 py-3 font-mono text-[9px] font-normal text-muted"
+                      className="w-[26%] px-4 py-3 font-mono text-micro font-normal text-muted"
                       scope="col"
                     >
                       критерий
                     </th>
                     <th
                       className={cn(
-                        'w-[37%] border-l border-line px-4 py-3 font-mono text-[10px] font-normal',
+                        'w-[37%] border-l border-line px-4 py-3 font-mono text-caption font-normal',
                         mode === 'initial-load'
                           ? 'bg-surface/50 text-text'
                           : 'text-muted',
@@ -134,7 +134,7 @@ export function Modes() {
                     </th>
                     <th
                       className={cn(
-                        'w-[37%] border-l border-line px-4 py-3 font-mono text-[10px] font-normal',
+                        'w-[37%] border-l border-line px-4 py-3 font-mono text-caption font-normal',
                         mode === 'mirror'
                           ? 'bg-surface/50 text-text'
                           : 'text-muted',
@@ -158,27 +158,27 @@ export function Modes() {
                       key={row.criterion}
                     >
                       <th
-                        className="px-4 py-3 text-left font-mono text-[9.5px] font-normal text-muted/75"
+                        className="px-4 py-3 text-left font-mono text-micro font-normal text-muted/75"
                         scope="row"
                       >
                         {row.criterion}
                       </th>
                       <td
                         className={cn(
-                          'border-l border-line/60 px-4 py-3 text-[11.5px] leading-relaxed',
+                          'border-l border-line/60 px-4 py-3 text-caption leading-relaxed',
                           mode === 'initial-load'
                             ? 'bg-surface/35 text-text/85'
-                            : 'text-muted/55',
+                            : 'text-muted/70',
                         )}
                       >
                         {row.initialLoad}
                       </td>
                       <td
                         className={cn(
-                          'border-l border-line/60 px-4 py-3 text-[11.5px] leading-relaxed',
+                          'border-l border-line/60 px-4 py-3 text-caption leading-relaxed',
                           mode === 'mirror'
                             ? 'bg-surface/35 text-text/85'
-                            : 'text-muted/55',
+                            : 'text-muted/70',
                         )}
                       >
                         {row.mirror}
@@ -187,12 +187,12 @@ export function Modes() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollFade>
           </div>
 
           <div className="mt-4 flex flex-col gap-3 rounded-lg border border-line bg-surface/35 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-[70ch]">
-              <p className="font-mono text-[9px] text-electric">
+              <p className="font-mono text-micro text-electric">
                 почему initial-load — дефолт
               </p>
               <p className="mt-1.5 text-[12.5px] leading-relaxed text-muted/85">
@@ -203,7 +203,7 @@ export function Modes() {
               </p>
             </div>
             <a
-              className="inline-flex shrink-0 items-center gap-2 rounded-md border border-line bg-surface/60 px-3 py-2 font-mono text-[9.5px] text-muted transition-colors hover:border-electric/40 hover:text-text"
+              className="inline-flex shrink-0 items-center gap-2 rounded-md border border-line bg-surface/60 px-3 py-2 font-mono text-micro text-muted transition-colors hover:border-electric/40 hover:text-text"
               href="#pipeline"
             >
               <Play aria-hidden="true" className="h-3 w-3" />
@@ -211,7 +211,7 @@ export function Modes() {
             </a>
           </div>
         </Reveal>
-      </div>
+      </Container>
     </section>
   );
 }
