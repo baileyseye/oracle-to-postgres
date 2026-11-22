@@ -4,8 +4,6 @@ services:
     container_name: oracle-to-postgres-oracle
     environment:
       ORACLE_PASSWORD: oracle
-      APP_USER: system
-      APP_USER_PASSWORD: oracle
     ports:
       - "1521:1521"
     healthcheck:

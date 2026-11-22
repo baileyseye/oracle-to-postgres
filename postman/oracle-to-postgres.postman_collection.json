@@ -1,0 +1,854 @@
+{
+  "info": {
+    "_postman_id": "b1a7c6d2-5e4f-4a3b-9c8d-1f2e3a4b5c6d",
+    "name": "Oracle → PostgreSQL: migration check",
+    "description": "Пошаговая проверка сервиса миграции. Запускай запросы сверху вниз или используй Collection Runner.\n\nПеред запуском: контейнеры healthy, приложения module-oracle (8081), module-postgres (8082) и module-migration (8083) запущены. Для эталонного прогона начни с чистой БД: docker compose down -v && docker compose up -d --wait, затем запусти приложения.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Oracle app health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Oracle app is UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{oracleBaseUrl}}/actuator/health",
+              "host": ["{{oracleBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PostgreSQL app health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"PostgreSQL app is UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/actuator/health",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Migration app health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Migration app is UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/actuator/health",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Состояние до миграции",
+      "item": [
+        {
+          "name": "Oracle users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Seed users are present\", () => {",
+                  "  const names = body.content.map(u => u.username);",
+                  "  pm.expect(names).to.include(\"oracle_admin\");",
+                  "  pm.expect(names).to.include(\"oracle_reader\");",
+                  "});",
+                  "pm.test(\"At least 2 users in Oracle\", () => pm.expect(body.totalElements).to.be.at.least(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{oracleBaseUrl}}/api/v1/oracle/get-users?page=0&size=20&sort=id",
+              "host": ["{{oracleBaseUrl}}"],
+              "path": ["api", "v1", "oracle", "get-users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Oracle orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"At least 4 orders in Oracle\", () => pm.expect(body.totalElements).to.be.at.least(4));",
+                  "pm.test(\"Order numbers are present\", () => {",
+                  "  const numbers = body.content.map(o => o.orderNumber);",
+                  "  [\"ORD-ORACLE-1001\", \"ORD-ORACLE-1002\", \"ORD-ORACLE-1003\", \"ORD-ORACLE-1004\"].forEach(n => pm.expect(numbers).to.include(n));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{oracleBaseUrl}}/api/v1/oracle/get-orders?page=0&size=20&sort=id",
+              "host": ["{{oracleBaseUrl}}"],
+              "path": ["api", "v1", "oracle", "get-orders"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PostgreSQL users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"PostgreSQL seed users are present\", () => {",
+                  "  const names = body.content.map(u => u.username);",
+                  "  pm.expect(names).to.include(\"postgres_admin\");",
+                  "  pm.expect(names).to.include(\"postgres_reader\");",
+                  "});",
+                  "pm.test(\"At least 2 users in PostgreSQL\", () => pm.expect(body.totalElements).to.be.at.least(2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-users?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PostgreSQL orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Orders endpoint returns a page\", () => pm.expect(body.content).to.be.an(\"array\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-orders?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-orders"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Migration status before",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"All counters are present\", () => {",
+                  "  [\"sourceUsers\", \"targetUsers\", \"targetManagedUsers\", \"sourceOrders\", \"targetOrders\", \"targetManagedOrders\"].forEach(k => pm.expect(body).to.have.property(k));",
+                  "});",
+                  "pm.test(\"Source has seed data\", () => {",
+                  "  pm.expect(body.sourceUsers).to.be.at.least(2);",
+                  "  pm.expect(body.sourceOrders).to.be.at.least(4);",
+                  "});",
+                  "pm.collectionVariables.set(\"sourceUsers\", body.sourceUsers);",
+                  "pm.collectionVariables.set(\"sourceOrders\", body.sourceOrders);",
+                  "pm.collectionVariables.set(\"targetUsersBeforeRun\", body.targetUsers);",
+                  "pm.collectionVariables.set(\"targetOrdersBeforeRun\", body.targetOrders);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/status",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Oracle tables",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"USERS is visible\", () => pm.expect(body).to.include(\"USERS\"));",
+                  "pm.test(\"ORDERS is visible\", () => pm.expect(body).to.include(\"ORDERS\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/tables",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "tables"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Users columns",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"All users columns are visible\", () => {",
+                  "  [\"ID\", \"USERNAME\", \"EMAIL\", \"CREATED_AT\", \"UPDATED_AT\"].forEach(c => pm.expect(body).to.include(c));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/tables/users/columns",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "tables", "users", "columns"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Insurance rows (read-only demo)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"10 insurance rows are readable\", () => pm.expect(body.length).to.eql(10));",
+                  "pm.test(\"Row has expected fields\", () => {",
+                  "  pm.expect(body[0]).to.have.property(\"ID\");",
+                  "  pm.expect(body[0]).to.have.property(\"NAME\");",
+                  "  pm.expect(body[0]).to.have.property(\"MEMBERSHIP\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/tables/insurance_program_users/rows",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "tables", "insurance_program_users", "rows"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unknown table returns 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/tables/no_such_table/rows",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "tables", "no_such_table", "rows"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Миграция и проверка",
+      "item": [
+        {
+          "name": "Run migration",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Report has all counters\", () => {",
+                  "  [\"usersRead\", \"usersInserted\", \"usersUpdated\", \"usersDeleted\", \"ordersRead\", \"ordersInserted\", \"ordersUpdated\", \"ordersDeleted\"].forEach(k => pm.expect(body).to.have.property(k));",
+                  "});",
+                  "pm.test(\"Source users were read\", () => pm.expect(body.usersRead).to.be.at.least(2));",
+                  "pm.test(\"Source orders were read\", () => pm.expect(body.ordersRead).to.be.at.least(4));",
+                  "pm.collectionVariables.set(\"lastUsersInserted\", body.usersInserted);",
+                  "pm.collectionVariables.set(\"lastOrdersInserted\", body.ordersInserted);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/run",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "run"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Migration status after",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"All Oracle orders are managed in PostgreSQL\", () => pm.expect(body.targetManagedOrders).to.eql(body.sourceOrders));",
+                  "pm.test(\"All Oracle users are managed in PostgreSQL\", () => pm.expect(body.targetManagedUsers).to.eql(body.sourceUsers));",
+                  "pm.test(\"PostgreSQL seeds are preserved\", () => pm.expect(body.targetUsers).to.be.at.least(body.sourceUsers + 2));",
+                  "pm.collectionVariables.set(\"usersAfterFirstRun\", body.targetUsers);",
+                  "pm.collectionVariables.set(\"ordersAfterFirstRun\", body.targetOrders);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/status",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "status"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify migrated users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const admin = body.content.find(u => u.username === \"oracle_admin\");",
+                  "const reader = body.content.find(u => u.username === \"oracle_reader\");",
+                  "pm.test(\"oracle_admin migrated\", () => pm.expect(admin).to.be.an(\"object\"));",
+                  "pm.test(\"oracle_reader migrated\", () => pm.expect(reader).to.be.an(\"object\"));",
+                  "pm.test(\"Source IDs were remapped\", () => {",
+                  "  pm.expect(admin.id).to.not.eql(1);",
+                  "  pm.expect(reader.id).to.not.eql(2);",
+                  "});",
+                  "if (admin) pm.collectionVariables.set(\"oracleAdminTargetId\", admin.id);",
+                  "if (reader) pm.collectionVariables.set(\"oracleReaderTargetId\", reader.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-users?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify migrated orders and FK",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const byNumber = n => body.content.find(o => o.orderNumber === n);",
+                  "const o1 = byNumber(\"ORD-ORACLE-1001\");",
+                  "const o3 = byNumber(\"ORD-ORACLE-1003\");",
+                  "pm.test(\"All 4 source orders exist\", () => {",
+                  "  [\"ORD-ORACLE-1001\", \"ORD-ORACLE-1002\", \"ORD-ORACLE-1003\", \"ORD-ORACLE-1004\"].forEach(n => pm.expect(byNumber(n)).to.be.an(\"object\"));",
+                  "});",
+                  "pm.test(\"Order 1001 belongs to oracle_admin\", () => pm.expect(o1.userId).to.eql(Number(pm.collectionVariables.get(\"oracleAdminTargetId\"))));",
+                  "pm.test(\"Order 1003 belongs to oracle_reader\", () => pm.expect(o3.userId).to.eql(Number(pm.collectionVariables.get(\"oracleReaderTargetId\"))));",
+                  "pm.test(\"Amount and status are preserved\", () => {",
+                  "  pm.expect(o1.amount).to.eql(1299.9);",
+                  "  pm.expect(o1.status).to.eql(\"NEW\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-orders?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-orders"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Идемпотентность",
+      "item": [
+        {
+          "name": "Run migration again",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"No duplicate users\", () => pm.expect(body.usersInserted).to.eql(0));",
+                  "pm.test(\"No duplicate orders\", () => pm.expect(body.ordersInserted).to.eql(0));",
+                  "pm.test(\"Nothing was deleted on idempotent run\", () => {",
+                  "  pm.expect(body.usersDeleted).to.eql(0);",
+                  "  pm.expect(body.ordersDeleted).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/run",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "run"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Counts did not change",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const usersBefore = Number(pm.collectionVariables.get(\"usersAfterFirstRun\"));",
+                  "const ordersBefore = Number(pm.collectionVariables.get(\"ordersAfterFirstRun\"));",
+                  "pm.test(\"User count unchanged\", () => pm.expect(body.targetUsers).to.eql(usersBefore));",
+                  "pm.test(\"Order count unchanged\", () => pm.expect(body.targetOrders).to.eql(ordersBefore));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/status",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Обновление данных из Oracle",
+      "item": [
+        {
+          "name": "Change Oracle user",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Email changed in Oracle\", () => pm.expect(body.email).to.eql(\"oracle.reader.changed@example.com\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"oracle_reader\",\n  \"email\": \"oracle.reader.changed@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{oracleBaseUrl}}/api/v1/oracle/users/2",
+              "host": ["{{oracleBaseUrl}}"],
+              "path": ["api", "v1", "oracle", "users", "2"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Oracle order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Order changed in Oracle\", () => {",
+                  "  pm.expect(body.amount).to.eql(777.77);",
+                  "  pm.expect(body.status).to.eql(\"PAID\");",
+                  "  pm.expect(body.userId).to.eql(1);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1,\n  \"orderNumber\": \"ORD-ORACLE-1004\",\n  \"amount\": 777.77,\n  \"status\": \"PAID\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{oracleBaseUrl}}/api/v1/oracle/orders/4",
+              "host": ["{{oracleBaseUrl}}"],
+              "path": ["api", "v1", "oracle", "orders", "4"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Run migration after changes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Users updated, not duplicated\", () => {",
+                  "  pm.expect(body.usersInserted).to.eql(0);",
+                  "  pm.expect(body.usersUpdated).to.be.at.least(2);",
+                  "});",
+                  "pm.test(\"Orders updated, not duplicated\", () => {",
+                  "  pm.expect(body.ordersInserted).to.eql(0);",
+                  "  pm.expect(body.ordersUpdated).to.be.at.least(4);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/run",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "run"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify changed user in PostgreSQL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const reader = body.content.find(u => u.username === \"oracle_reader\");",
+                  "pm.test(\"Changed email reached PostgreSQL\", () => {",
+                  "  pm.expect(reader).to.be.an(\"object\");",
+                  "  pm.expect(reader.email).to.eql(\"oracle.reader.changed@example.com\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-users?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-users"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify changed order in PostgreSQL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "const order = body.content.find(o => o.orderNumber === \"ORD-ORACLE-1004\");",
+                  "pm.test(\"Order changed in PostgreSQL\", () => {",
+                  "  pm.expect(order).to.be.an(\"object\");",
+                  "  pm.expect(order.amount).to.eql(777.77);",
+                  "  pm.expect(order.status).to.eql(\"PAID\");",
+                  "});",
+                  "pm.test(\"New owner was remapped\", () => pm.expect(order.userId).to.eql(Number(pm.collectionVariables.get(\"oracleAdminTargetId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{postgresBaseUrl}}/api/v1/postgres/get-orders?page=0&size=20&sort=id",
+              "host": ["{{postgresBaseUrl}}"],
+              "path": ["api", "v1", "postgres", "get-orders"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "id" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Final status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"All Oracle orders are managed in PostgreSQL\", () => pm.expect(body.targetManagedOrders).to.eql(body.sourceOrders));",
+                  "pm.test(\"All Oracle users are managed in PostgreSQL\", () => pm.expect(body.targetManagedUsers).to.eql(body.sourceUsers));",
+                  "pm.test(\"User counts include 2 PostgreSQL seeds\", () => pm.expect(body.targetUsers).to.be.at.least(body.sourceUsers + 2));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/status",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "status"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Schema diff",
+      "item": [
+        {
+          "name": "Schema diff",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Schema is valid\", () => pm.expect(body.valid).to.eql(true));",
+                  "pm.test(\"No missing tables\", () => pm.expect(body.missingTables).to.eql(0));",
+                  "pm.test(\"No missing columns\", () => pm.expect(body.missingColumns).to.eql(0));",
+                  "pm.test(\"No missing indexes\", () => pm.expect(body.missingIndexes).to.eql(0));",
+                  "pm.test(\"No schema errors\", () => pm.expect(body.errors).to.eql(0));",
+                  "pm.test(\"No schema warnings\", () => pm.expect(body.warnings).to.eql(0));",
+                  "pm.test(\"At least 3 tables checked\", () => pm.expect(body.checkedTables).to.be.at.least(3));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{migrationBaseUrl}}/api/v1/migration/schema/diff",
+              "host": ["{{migrationBaseUrl}}"],
+              "path": ["api", "v1", "migration", "schema", "diff"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "oracleBaseUrl", "value": "http://localhost:8081" },
+    { "key": "postgresBaseUrl", "value": "http://localhost:8082" },
+    { "key": "migrationBaseUrl", "value": "http://localhost:8083" }
+  ]
+}

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet author="FStavcev" id="insert-orders-oracle">
+    <preConditions onFail="MARK_RAN">
+      <sqlCheck expectedResult="0">SELECT COUNT(*) FROM orders</sqlCheck>
+    </preConditions>
+    <sql>
+      INSERT INTO orders (user_id, order_number, amount, status, created_at)
+      SELECT id, 'ORD-ORACLE-1001', 1299.90, 'NEW', LOCALTIMESTAMP
+      FROM users
+      WHERE username = 'oracle_admin';
+    </sql>
+    <sql>
+      INSERT INTO orders (user_id, order_number, amount, status, created_at)
+      SELECT id, 'ORD-ORACLE-1002', 249.50, 'PAID', LOCALTIMESTAMP
+      FROM users
+      WHERE username = 'oracle_admin';
+    </sql>
+    <sql>
+      INSERT INTO orders (user_id, order_number, amount, status, created_at)
+      SELECT id, 'ORD-ORACLE-1003', 99.99, 'SHIPPED', LOCALTIMESTAMP
+      FROM users
+      WHERE username = 'oracle_reader';
+    </sql>
+    <sql>
+      INSERT INTO orders (user_id, order_number, amount, status, created_at)
+      SELECT id, 'ORD-ORACLE-1004', 15.00, 'CANCELLED', LOCALTIMESTAMP
+      FROM users
+      WHERE username = 'oracle_reader';
+    </sql>
+
+    <rollback>
+      <sql>
+        DELETE FROM orders
+        WHERE order_number IN (
+        'ORD-ORACLE-1001'
+        ,'ORD-ORACLE-1002'
+        ,'ORD-ORACLE-1003'
+        ,'ORD-ORACLE-1004'
+        );
+      </sql>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

@@ -4,9 +4,9 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -26,10 +26,23 @@ public class MigrationGlobalExceptionHandler {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Источник миграции недоступен");
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException exception) {
-        log.warn("Ошибка валидации запроса: {}", exception.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, "Запрос не прошёл валидацию");
+    @ExceptionHandler(MigrationConflictException.class)
+    public ResponseEntity<Map<String, Object>> handleConflict(MigrationConflictException exception) {
+        log.warn("Конфликт данных при миграции: {}", exception.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(TargetAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleTargetAccess(TargetAccessException exception) {
+        log.error("Ошибка доступа к приёмнику миграции: {}",
+            exception.getMessage(), exception.getCause());
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "Приёмник миграции недоступен");
+    }
+
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<Map<String, Object>> handleDataAccess(DataAccessException exception) {
+        log.error("Ошибка доступа к базе данных миграции: {}", exception.getMessage(), exception);
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "База данных миграции недоступна");
     }
 
     @ExceptionHandler(MigrationException.class)

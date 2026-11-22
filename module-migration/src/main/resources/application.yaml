@@ -7,7 +7,7 @@ spring:
     password: ${SOURCE_ORACLE_PASSWORD:oracle}
     driver-class-name: oracle.jdbc.OracleDriver
     hikari:
-      pool-name: migration-hikari
+      pool-name: migration-source-hikari
       maximum-pool-size: 10
       minimum-idle: 2
       connection-timeout: 30000
@@ -16,12 +16,37 @@ spring:
       connection-test-query: SELECT 1 FROM DUAL
 
 migration:
+  schema:
+    validation:
+      fail-on-warnings: false
+      compare-check-constraints: true
   source:
     schema: ${SOURCE_ORACLE_SCHEMA:}
     row-limit: 100
     excluded-tables:
       - DATABASECHANGELOG
       - DATABASECHANGELOGLOCK
+      - AQ$_*
+      - HELP
+      - MVIEW$_*
+      - OL$*
+      - REDO_*
+      - SCHEDULER_*
+      - SQLPLUS_PRODUCT_PROFILE
+  target:
+    url: ${TARGET_POSTGRES_URL:jdbc:postgresql://localhost:5432/oracletopostgres}
+    username: ${TARGET_POSTGRES_USERNAME:postgres}
+    password: ${TARGET_POSTGRES_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+    schema: ${TARGET_POSTGRES_SCHEMA:public}
+    hikari:
+      pool-name: migration-target-hikari
+      maximum-pool-size: 5
+      minimum-idle: 1
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
 
 server:
   port: 8083

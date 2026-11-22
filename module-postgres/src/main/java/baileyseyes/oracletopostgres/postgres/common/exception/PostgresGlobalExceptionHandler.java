@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -28,6 +30,30 @@ public class PostgresGlobalExceptionHandler {
   public ResponseEntity<Map<String, Object>> handleDuplicate(DuplicateUserException exception) {
     log.warn("Нарушена уникальность пользователя: {}", exception.getMessage());
     return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
+  }
+
+  @ExceptionHandler(OrderNotFoundException.class)
+  public ResponseEntity<Map<String, Object>> handleOrderNotFound(OrderNotFoundException exception) {
+    log.warn("Заказ не найден: {}", exception.getMessage());
+    return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+  }
+
+  @ExceptionHandler(DuplicateOrderException.class)
+  public ResponseEntity<Map<String, Object>> handleDuplicateOrder(DuplicateOrderException exception) {
+    log.warn("Нарушена уникальность заказа: {}", exception.getMessage());
+    return buildResponse(HttpStatus.CONFLICT, exception.getMessage());
+  }
+
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException exception) {
+    log.warn("Нарушение целостности данных: {}", exception.getMostSpecificCause().getMessage());
+    return buildResponse(HttpStatus.CONFLICT, "Операция нарушает целостность данных");
+  }
+
+  @ExceptionHandler(DataAccessException.class)
+  public ResponseEntity<Map<String, Object>> handleDataAccess(DataAccessException exception) {
+    log.error("Ошибка доступа к PostgreSQL: {}", exception.getMessage(), exception);
+    return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "База данных PostgreSQL недоступна");
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

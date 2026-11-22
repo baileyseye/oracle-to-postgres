@@ -32,12 +32,12 @@ public class UserResponseDto {
     String email;
 
     /**
-     * Момент создания записи в UTC.
+     * Момент создания записи в локальном времени приложения.
      */
     LocalDateTime createdAt;
 
     /**
-     * Момент последнего изменения записи в UTC.
+     * Момент последнего изменения записи в локальном времени приложения.
      */
     LocalDateTime updatedAt;
 }

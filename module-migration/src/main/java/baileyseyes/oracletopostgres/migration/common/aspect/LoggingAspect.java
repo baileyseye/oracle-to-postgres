@@ -1,6 +1,8 @@
 package baileyseyes.oracletopostgres.migration.common.aspect;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
  * Сквозное логирование входов, выходов и длительности вызовов слоёв контроллеров и сервисов.
  * <br>
  * Логика логирования вынесена из бизнес-кода: контроллеры и сервисы о ней не знают.
+ * Полные значения аргументов и результатов не пишутся, чтобы не попасть в лог персональными данными.
  */
 @Slf4j
 @Aspect
@@ -23,10 +26,14 @@ public class LoggingAspect {
     }
 
     @Pointcut("within(baileyseyes.oracletopostgres.migration.source.service..*)")
-    public void serviceLayer() {
+    public void sourceServiceLayer() {
     }
 
-    @Around("controllerLayer() || serviceLayer()")
+    @Pointcut("within(baileyseyes.oracletopostgres.migration.service..*)")
+    public void migrationServiceLayer() {
+    }
+
+    @Around("controllerLayer() || sourceServiceLayer() || migrationServiceLayer()")
     public Object logInvocation(ProceedingJoinPoint joinPoint) throws Throwable {
         String signature = joinPoint.getSignature().toShortString();
         Object[] arguments = joinPoint.getArgs();
@@ -60,24 +67,20 @@ public class LoggingAspect {
             return "[]";
         }
 
-        StringBuilder builder = new StringBuilder("[");
-
-        for (int index = 0; index < arguments.length; index++) {
-            if (index > 0) {
-                builder.append(", ");
-            }
-
-            builder.append(arguments[index]);
-        }
-
-        return builder.append(']').toString();
+        return Arrays.stream(arguments)
+            .map(argument -> argument == null ? "null" : argument.getClass().getSimpleName())
+            .collect(Collectors.joining(", ", "[", "]"));
     }
 
     private String describeResult(Object result) {
+        if (result == null) {
+            return "null";
+        }
+
         if (result instanceof Collection<?> collection) {
             return "коллекция из " + collection.size() + " элементов";
         }
 
-        return String.valueOf(result);
+        return result.getClass().getSimpleName();
     }
 }

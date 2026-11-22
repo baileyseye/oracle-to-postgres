@@ -1,10 +1,16 @@
 # oracle-to-postgres
 
 Демонстрационный проект: **два независимых Spring Boot приложения** с идентичной структурой слоёв и
-одинаковой бизнес-логикой (CRUD над `User`), но разными СУБД — **Oracle** и **PostgreSQL**.
+одинаковой бизнес-логикой (CRUD над `User` и `Order`), но разными СУБД — **Oracle** и **PostgreSQL**.
+Четвёртый модуль — schema migration, который строит PostgreSQL-схему по Oracle. Третий —
+data migration, который переносит данные в уже готовую схему.
 
 Смысл проекта — сравнить поведение одного и того же JPA-кода на двух диалектах при полностью
-разделённых схемах, конфигурациях и Liquibase-миграциях.
+разделённых схемах, конфигурациях и Liquibase-миграциях, а затем выполнить реальный перенос
+схемы и данных. Есть два режима target:
+
+- **Liquibase-owned**: схему `public` создаёт `module-postgres`;
+- **schema-migration-owned**: схему `auto_migration` создаёт `module-schema-migration`.
 
 > ⚠️ **Этот файл — карта проекта для разработчиков и ИИ-агентов.** Если вы меняете структуру,
 > обновите карту в том же коммите.
@@ -32,7 +38,7 @@
 
 ```
 oracle-to-postgres/
-├── settings.gradle.kts          # include("module-oracle", "module-postgres", "module-migration")
+├── settings.gradle.kts          # include oracle, postgres, migration, schema-migration
 ├── build.gradle.kts             # только общие group/version/repositories; плагины apply false
 ├── gradle/wrapper/              # Gradle 9.8.2
 ├── docker-compose.yaml          # gvenzl/oracle-free:23-slim (1521) + postgres:17-alpine (5432)
@@ -43,10 +49,9 @@ oracle-to-postgres/
 │
 ├── module-oracle/               # SOURCE (legacy), порт 8081, префикс /api/v1/oracle
 ├── module-postgres/             # TARGET (новая система), порт 8082, префикс /api/v1/postgres
-└── module-migration/            # СЕРВИС МИГРАЦИИ, порт 8083, префикс /api/v1/migration
+├── module-migration/            # DATA MIGRATION, порт 8083, префикс /api/v1/migration
+└── module-schema-migration/     # SCHEMA MIGRATION, порт 8084, префикс /api/v1/schema-migration
 ```
-
-> `KODA.md` и `LIQUIBASE-ARCHITECTURE.md` добавлены в `.gitignore` (правила для AI/разработчиков, не код).
 
 **Корневого `src/` нет.** Точки входа живут внутри модулей. Не ищите `OracleToPostgresApplication` —
 он удалён при переходе на мультимодульную сборку (в git-индексе ещё числится как удалённый,
@@ -56,12 +61,21 @@ oracle-to-postgres/
 
 | Модуль | Роль в миграции | Данные | Порт |
 |---|---|---|---|
-| `module-oracle` | **SOURCE** — старая система | есть, включая `insurance_program_users` (10 строк) | 8081 |
-| `module-postgres` | **TARGET** — новая система | структура готова, `insurance_program_users` пуста | 8082 |
-| `module-migration` | **СЕРВИС МИГРАЦИИ** — читает источник | своих данных нет | 8083 |
+| `module-oracle` | **SOURCE** — старая система | есть: `users`, `orders` (4 строки), `insurance_program_users` (10 строк) | 8081 |
+| `module-postgres` | **TARGET** — новая система, схему создаёт Liquibase | `public`; `orders` пуста до миграции, `insurance_program_users` не переносится | 8082 |
+| `module-migration` | **DATA MIGRATION** — читает Oracle и пишет в уже готовую PostgreSQL-схему | своих данных нет; требует готовые таблицы и `migration_entity_map` | 8083 |
+| `module-schema-migration` | **SCHEMA MIGRATION** — читает Oracle и создаёт PostgreSQL-схему с нуля | `auto_migration` | 8084 |
 
-PostgreSQL **не «уже смигрирован»** — он «готов принять миграцию». Данные приезжают через
-`module-migration`. Направление: **Oracle → PostgreSQL**.
+**Политика ownership:**
+
+- схема `public` принадлежит Liquibase `module-postgres`;
+- схема `auto_migration` принадлежит `module-schema-migration`;
+- `module-migration` **не создаёт** таблицы и не владеет схемой: он только переносит данные
+  и работает с тем target-схемой, которую ему указали через `TARGET_POSTGRES_SCHEMA`;
+- `module-schema-migration` дополнительно создаёт служебную `migration_entity_map`, чтобы data-модуль
+  мог работать с новой схемой без Liquibase.
+
+Направление: **Oracle → PostgreSQL**.
 
 
 ---
@@ -83,16 +97,28 @@ module-oracle/
     │   │   ├── OracleModuleException.java      ← базовое RuntimeException модуля
     │   │   ├── UserNotFoundException.java      ← 404, пользователь не найден
     │   │   ├── DuplicateUserException.java     ← 409, конфликт username/email
+    │   │   ├── OrderNotFoundException.java     ← 404, заказ не найден
+    │   │   ├── DuplicateOrderException.java    ← 409, конфликт order_number
     │   │   └── OracleGlobalExceptionHandler.java ← @RestControllerAdvice, единый JSON ошибок
     │   │
-    │   └── user/                               ← вертикальный срез фичи "пользователи"
-    │       ├── entity/UserEntity.java          ← @Entity, таблица users
-    │       ├── repository/UserRepository.java  ← JpaRepository + existsBy*/findBy*
-    │       ├── dto/UserRequestDto.java         ← вход, jakarta.validation
-    │       ├── dto/UserResponseDto.java        ← выход, audit-поля
-    │       ├── mapper/UserMapper.java          ← MapStruct, @Mapper(SPRING)
-    │       ├── service/UserService.java        ← @Service, БЕЗ интерфейса, CRUD
-    │       └── controller/UserController.java  ← @RestController, /api/v1/oracle
+    │   ├── user/                               ← вертикальный срез фичи "пользователи"
+    │   │   ├── entity/UserEntity.java          ← @Entity, таблица users
+    │   │   ├── repository/UserRepository.java  ← JpaRepository + existsBy*/findBy*
+    │   │   ├── dto/UserRequestDto.java         ← вход, jakarta.validation
+    │   │   ├── dto/UserResponseDto.java        ← выход, audit-поля
+    │   │   ├── mapper/UserMapper.java          ← MapStruct, @Mapper(SPRING)
+    │   │   ├── service/UserService.java        ← @Service, БЕЗ интерфейса, CRUD
+    │   │   └── controller/UserController.java  ← @RestController, /api/v1/oracle
+    │   │
+    │   └── order/                              ← вертикальный срез фичи "заказы"
+    │       ├── entity/OrderEntity.java         ← @Entity, таблица orders, @ManyToOne → users
+    │       ├── entity/OrderStatus.java         ← enum NEW/PAID/SHIPPED/CANCELLED
+    │       ├── repository/OrderRepository.java ← JpaRepository + findByOrderNumber
+    │       ├── dto/OrderRequestDto.java        ← вход, jakarta.validation
+    │       ├── dto/OrderResponseDto.java       ← выход + userId/username
+    │       ├── mapper/OrderMapper.java         ← MapStruct, user → userId/username
+    │       ├── service/OrderService.java       ← @Service, CRUD + проверка пользователя
+    │       └── controller/OrderController.java ← @RestController, /api/v1/oracle
     │
     └── resources/
         ├── application.yaml                    ← datasource, dialect, ddl-auto=validate, liquibase
@@ -111,12 +137,16 @@ module-oracle/
 | `mapper/UserMapper` | DTO ↔ Entity, **явные `@Mapping` для всех полей** | при добавлении поля в DTO/Entity |
 | `service/UserService` | бизнес-логика, `@Transactional` **на методах** | при новой бизнес-логике |
 | `controller/UserController` | REST, Javadoc-примеры для Postman | при новом эндпоинте |
+| `entity/OrderEntity` + `OrderStatus` | таблица `orders`, `@ManyToOne` → `users`, enum-статус | при изменении схемы заказов |
+| `dto/Order*` + `mapper/OrderMapper` | контракт заказа; `user` разворачивается в `userId`/`username` | при изменении контракта |
+| `service/OrderService` | CRUD заказов + проверка существования пользователя | при новой бизнес-логике заказов |
+| `controller/OrderController` | REST заказов, Javadoc-примеры | при новом эндпоинте заказов |
 | `common/exception/*` | кастомные исключения + `@RestControllerAdvice` | при новом типе ошибки |
 | `application.yaml` | подключение к СУБД, порт, Liquibase | при смене настроек подключения |
 
 ### 3.2 Карта `module-migration` (структура отличается от CRUD-модулей)
 
-Модуль **не использует JPA**: только `JdbcTemplate`, `DatabaseMetaData` и `DataSource`.
+Модуль **не использует JPA**: только `JdbcTemplate`, `DatabaseMetaData` и два `DataSource`.
 
 ```
 module-migration/
@@ -127,32 +157,71 @@ module-migration/
     │   ├── MigrationModuleApplication.java      ← @SpringBootApplication + @ConfigurationPropertiesScan
     │   │
     │   ├── common/
-    │   │   ├── aspect/LoggingAspect.java        ← @Aspect: логирование входа/выхода/длительности
+    │   │   ├── aspect/LoggingAspect.java        ← @Aspect: контроллеры и сервисы миграции
+    │   │   ├── support/
+    │   │   │   ├── CheckConstraintMetadata.java  ← CHECK-constraint: имя + выражение
+    │   │   │   ├── ColumnMetadata.java           ← тип, размер, nullable, default, identity
+    │   │   │   ├── ForeignKeyMetadata.java       ← колонки, ссылка и ON UPDATE/DELETE
+    │   │   │   ├── IndexMetadata.java            ← описание индекса: уникальность + колонки
+    │   │   │   ├── IndexMetadataReader.java      ← чтение индексов через DatabaseMetaData
+    │   │   │   ├── JdbcTableMetadataReader.java  ← колонки, PK и FK через DatabaseMetaData
+    │   │   │   ├── MigrationEntity.java          ← тип сущности: USER / ORDER
+    │   │   │   ├── PrimaryKeyMetadata.java       ← имя и состав колонок PK
+    │   │   │   └── RowValues.java                ← извлечение колонок Oracle без учёта регистра
     │   │   └── exception/
     │   │       ├── MigrationException.java      ← базовое RuntimeException модуля
     │   │       ├── TableNotFoundException.java  ← 404, таблицы нет в метаданных
     │   │       ├── SourceAccessException.java   ← 503, источник недоступен
+    │   │       ├── TargetAccessException.java   ← 503, приёмник недоступен
+    │   │       ├── MigrationConflictException.java ← 409, конфликт данных в приёмнике
     │   │       └── MigrationGlobalExceptionHandler.java ← @RestControllerAdvice
     │   │
-    │   ├── controller/MigrationController.java  ← 3 read-only эндпоинта
+    │   ├── controller/MigrationController.java  ← чтение источника + /run + /status
+    │   ├── dto/
+    │   │   ├── MigrationReport.java             ← итоги /run, включая удалённые строки
+    │   │   ├── MigrationStatus.java             ← COUNT(*) и количество управляемых строк
+    │   │   ├── SchemaDiffReport.java            ← итог сравнения: errors/warnings/infos
+    │   │   ├── SchemaIssue.java                 ← одно расхождение с severity
+    │   │   └── TableDiff.java                   ← расхождения по одной таблице
     │   │
-    │   └── source/                              ← слой доступа к источнику
-    │       ├── config/MigrationSourceProperties.java ← @ConfigurationProperties("migration.source")
-    │       ├── contract/
-    │       │   ├── MetadataProvider.java        ← ИНТЕРФЕЙС: listTables, listColumns, resolveTableName
-    │       │   └── RowReader.java               ← ИНТЕРФЕЙС: readRows
-    │       ├── oracle/
-    │       │   ├── OracleMetadataProvider.java  ← DatabaseMetaData.getTables/getColumns
-    │       │   └── OracleRowReader.java         ← JdbcTemplate + ROWNUM, каноническое имя таблицы
-    │       └── service/MigrationSourceService.java ← оркестрация для контроллера
+    │   ├── service/                             ← бизнес-логика зеркального переноса
+    │   │   ├── UserMigrationService.java        ← users: mirror по source id + удаление stale
+    │   │   ├── OrderMigrationService.java       ← orders: mirror по source id + FK из карты
+    │   │   ├── MigrationOrchestrationService.java ← users → orders → cleanup
+    │   │   ├── MigrationStatisticsService.java  ← COUNT(*) в Oracle и PostgreSQL
+    │   │   ├── SchemaDiffService.java           ← сравнение таблиц, колонок, PK/FK, индексов, CHECK
+    │   │   ├── SchemaTypeCompatibility.java     ← Oracle→PostgreSQL type compatibility
+    │   │   ├── SchemaValidationProperties.java  ← fail-on-warnings, check comparison
+    │   │   └── result/                          ← record-результаты шагов
+    │   │
+    │   ├── source/                              ← слой доступа к источнику (Oracle)
+    │   │   ├── config/
+    │   │   │   ├── MigrationSourceProperties.java ← @ConfigurationProperties("migration.source")
+    │   │   │   ├── SourceDataSourceProperties.java ← @ConfigurationProperties("spring.datasource")
+    │   │   │   └── SourceDataSourceConfig.java  ← @Primary sourceDataSource + sourceJdbcTemplate
+    │   │   ├── contract/
+    │   │   │   ├── MetadataProvider.java        ← listTables, listColumns, listIndexes, qualifiedTableName
+    │   │   │   └── RowReader.java               ← readRows, forEachRow
+    │   │   ├── oracle/
+    │   │   │   ├── OracleMetadataProvider.java  ← DatabaseMetaData + схема + wildcard-исключения
+    │   │   │   └── OracleRowReader.java         ← streaming, ROWNUM, нормализация JDBC-типов
+    │   │   └── service/MigrationSourceService.java ← оркестрация read-only эндпоинтов
+    │   │
+    │   └── target/                              ← слой записи в PostgreSQL
+    │       ├── config/
+    │       │   ├── MigrationTargetProperties.java ← @ConfigurationProperties("migration.target")
+    │       │   └── TargetDataSourceConfig.java  ← targetDataSource, targetJdbcTemplate, targetTransactionManager
+    │       └── service/
+    │           ├── MigrationMapping.java        ← record: target id + последний source key
+    │           └── PostgresTargetGateway.java   ← CRUD users/orders + migration_entity_map
     │
-    └── resources/application.yaml               ← datasource, hikari, migration.source.*
+    └── resources/application.yaml               ← два datasource, migration.source.*, migration.target.*
 ```
 
-**Ключевая идея расширения:** контроллер зависит **только** от `MetadataProvider` / `RowReader`.
-Новая СУБД = новый пакет `source/<db>/` с двумя реализациями, контроллер и сервис не меняются.
+**Ключевая идея расширения источника:** контроллер зависит **только** от `MetadataProvider` / `RowReader`.
+Новая СУБД-источник = новый пакет `source/<db>/` с двумя реализациями, контроллер и сервис не меняются.
 
-**Поток запроса в `module-migration`:**
+**Поток запроса чтения:**
 
 ```
 HTTP
@@ -163,20 +232,100 @@ MigrationSourceService           row-limit из MigrationSourceProperties
  ▼
 MetadataProvider / RowReader     ← интерфейсы-контракты
  ▼
-OracleMetadataProvider           DatabaseMetaData (getTables / getColumns)
-OracleRowReader                  SELECT * FROM "<канон. имя>" WHERE ROWNUM <= ?
+OracleMetadataProvider           DatabaseMetaData + схема источника
+OracleRowReader                  SELECT * FROM "SCHEMA"."TABLE" WHERE ROWNUM <= ?
  ▼
 Oracle (SOURCE)
 ```
 
-**Защита от SQL-инъекций:** имя таблицы из path-параметра проходит через
-`resolveTableName()`, который сверяет его со списком из `DatabaseMetaData` и возвращает
-каноническое имя СУБД; в SQL подставляется только оно, в двойных кавычках.
-При промахе — `TableNotFoundException` (404) и `WARN` в лог.
+**Поток зеркальной миграции:**
 
-**Слои логирования:** `LoggingAspect` покрывает pointcut'ы `controller..*` и `source.service..*`.
-`INFO` — успешное завершение с длительностью, `DEBUG` — аргументы и результат,
-`WARN` — исключения (включая попытки чтения таблицы вне метаданных).
+```
+POST /api/v1/migration/run
+ ▼
+MigrationController
+ ▼
+MigrationOrchestrationService    @Transactional("targetTransactionManager")
+ ├─ UserMigrationService        users: insert/update/delete по source id
+ │    └─ migration_entity_map: source user id → target user id
+ ├─ OrderMigrationService       orders: insert/update/delete по source id
+ │    └─ user_id и order_number берутся из актуальных данных
+ └─ UserMigrationService        удаление пользователей, исчезнувших из Oracle
+ ▼
+PostgresTargetGateway           RETURNING id, schema из migration.target.schema
+```
+
+**Зеркальность:** для каждого типа сущности хранится соответствие `source_id → target_id`
+в таблице `migration_entity_map` (создаёт Liquibase модуля `module-postgres`). Поэтому:
+
+- при смене `username` или `order_number` обновляется **та же** целевая строка;
+- строки, удалённые из Oracle, удаляются из PostgreSQL;
+- заказы удаляются раньше пользователей, чтобы не нарушить FK;
+- нативные строки PostgreSQL, которых нет в Oracle (например, `postgres_admin`/`postgres_reader`),
+  не имеют записи в `migration_entity_map` и не затрагиваются.
+
+**Идемпотентность:** повторный `/run` обновляет управляемые строки и не создаёт дубликаты.
+Исходные id Oracle в PostgreSQL не копируются — они хранятся только в `migration_entity_map`.
+Все записи приёмника выполняются в одной транзакции: ошибка на любом шаге откатывает весь перенос.
+
+**Защита от SQL-инъекций:** имя таблицы из path-параметра проходит через
+`qualifiedTableName()`, который сверяет его со списком из `DatabaseMetaData`, добавляет схему
+и экранирует имена. При промахе — `TableNotFoundException` (404) и `WARN` в лог.
+Имена таблиц приёмника фиксированы в коде, схема приходит из конфигурации и экранируется.
+
+**Слои логирования:** `LoggingAspect` покрывает pointcut'ы `controller..*`, `source.service..*`
+и `service..*`. `INFO` — успешное завершение с длительностью, `DEBUG` — только типы аргументов
+и результатов (без значений, чтобы не писать в лог персональные данные), `WARN` — исключения.
+
+### 3.3 Карта `module-schema-migration`
+
+Модуль **не использует JPA и Liquibase**: он читает Oracle через JDBC, генерирует PostgreSQL DDL
+и применяет его через `JdbcTemplate` в target-транзакции.
+
+```
+module-schema-migration/
+└── src/main/
+    ├── java/baileyseyes/oracletopostgres/schema/
+    │   ├── SchemaMigrationModuleApplication.java
+    │   ├── common/exception/                 ← 503 source/target, 500 schema error
+    │   ├── controller/SchemaMigrationController.java
+    │   ├── dto/
+    │   │   ├── SchemaMigrationPlan.java      ← DDL + warnings + unsupported
+    │   │   ├── SchemaMigrationReport.java    ← результат apply
+    │   │   ├── SchemaMigrationStatus.java    ← target tables/columns
+    │   │   └── SchemaDdlStatement.java
+    │   ├── model/                            ← Oracle table/column/PK/FK/index/check/sequence
+    │   ├── source/
+    │   │   ├── config/                       ← Oracle DataSource
+    │   │   └── oracle/OracleSchemaReader.java
+    │   ├── generator/
+    │   │   ├── PostgresTypeMapper.java       ← Oracle→PostgreSQL types/defaults
+    │   │   └── PostgresDdlGenerator.java     ← CREATE/ALTER/INDEX/COMMENT DDL
+    │   ├── target/
+    │   │   ├── config/                       ← PostgreSQL DataSource + transaction manager
+    │   │   └── service/                      ← target snapshot + DDL applier
+    │   └── service/SchemaMigrationService.java
+    └── resources/application.yaml            ← port 8084, target schema auto_migration
+```
+
+**Поток schema migration:**
+
+```
+GET  /preview → OracleSchemaReader → PostgresDdlGenerator → SchemaMigrationPlan (DDL, без apply)
+POST /apply   → preview → PostgresSchemaApplier → DDL в одной target-транзакции
+GET  /status  → source schema vs target snapshot → missing tables/columns
+```
+
+**Что переносится автоматически:** таблицы, колонки, типы, defaults, identity, PK, unique,
+FK, ordinary indexes, CHECK-constraints (простые выражения), комментарии и пользовательские sequences.
+
+**Что не переносится автоматически и попадает в `unsupportedObjects`/warnings:** views, triggers,
+PL/SQL (procedures/functions/packages/types), synonyms, grants/roles, partitioning, tablespaces.
+Для production эти объекты требуют отдельного решения или ручного review.
+
+**Drift:** для уже существующих таблиц модуль добавляет только отсутствующие колонки (nullable)
+и не меняет типы/constraints автоматически. Остальной drift нужно разбирать вручную после
+`GET /status`/schema validator.
 
 ---
 
@@ -201,6 +350,10 @@ Hibernate (OracleDialect / PostgreSQLDialect)
  ▼
 Oracle / PostgreSQL       схема создаётся ТОЛЬКО Liquibase, ddl-auto=validate
 ```
+
+Срез заказов устроен так же: `OrderController → OrderService → OrderMapper → OrderRepository`,
+дополнительно проверяется существование пользователя (`UserNotFoundException`, 404) и уникальность
+`order_number` (`DuplicateOrderException`, 409).
 
 Ошибки перехватывает `XGlobalExceptionHandler` и отдаёт JSON:
 
@@ -233,8 +386,20 @@ Oracle / PostgreSQL       схема создаётся ТОЛЬКО Liquibase, 
 
 `get-users` поддерживает `page`, `size`, `sort` (по умолчанию `size=20`, `sort=id`).
 
+Заказы (`orders`) повторяют тот же набор операций. В ответе есть `userId` и `username` владельца.
+
+| Метод | Oracle (8081) | PostgreSQL (8082) | Успех |
+|---|---|---|---|
+| POST | `/api/v1/oracle/orders` | `/api/v1/postgres/orders` | 201 + тело |
+| GET | `/api/v1/oracle/orders/{id}` | `/api/v1/postgres/orders/{id}` | 200 / 404 |
+| GET | `/api/v1/oracle/get-orders` | `/api/v1/postgres/get-orders` | 200 + `Page` |
+| PUT | `/api/v1/oracle/orders/{id}` | `/api/v1/postgres/orders/{id}` | 200 / 404 / 409 |
+| DELETE | `/api/v1/oracle/orders/{id}` | `/api/v1/postgres/orders/{id}` | 204 / 404 |
+
+`get-orders` дополнительно принимает `userId` для фильтрации по владельцу.
+
 ```bash
-# создание
+# создание пользователя
 curl -X POST http://localhost:8081/api/v1/oracle/users \
   -H "Content-Type: application/json" \
   -d '{"username":"ivan_petrov","email":"ivan.petrov@example.com"}'
@@ -249,17 +414,28 @@ curl -X PUT http://localhost:8081/api/v1/oracle/users/1 \
 
 # удаление
 curl -X DELETE http://localhost:8082/api/v1/postgres/users/1
+
+# создание заказа
+curl -X POST http://localhost:8081/api/v1/oracle/orders \
+  -H "Content-Type: application/json" \
+  -d '{"userId":1,"orderNumber":"ORD-ORACLE-2001","amount":1499.90,"status":"NEW"}'
+
+# заказы пользователя
+curl "http://localhost:8082/api/v1/postgres/get-orders?userId=3&page=0&size=20&sort=id,desc"
 ```
 
 ### 5.2 Сервис миграции (`module-migration`, порт 8083)
 
-Работает **только с источником (Oracle)**. Все эндпоинты read-only, префикс `/api/v1/migration`.
+Читает Oracle-источник и записывает в PostgreSQL-приёмник. Префикс `/api/v1/migration`.
 
 | Метод | Путь | Выход |
 |---|---|---|
-| GET | `/api/v1/migration/tables` | `String[]` — таблицы схемы источника (служебные исключены) |
+| GET | `/api/v1/migration/tables` | `String[]` — таблицы схемы источника (системные и Liquibase исключены) |
 | GET | `/api/v1/migration/tables/{tableName}/columns` | `String[]` — колонки таблицы из `DatabaseMetaData` |
 | GET | `/api/v1/migration/tables/{tableName}/rows` | `List<Map<String,Object>>` — `SELECT *` с лимитом из конфига |
+| POST | `/api/v1/migration/run` | `MigrationReport` — прочитано/вставлено/обновлено/удалено |
+| GET | `/api/v1/migration/status` | `MigrationStatus` — `COUNT(*)` и число управляемых строк |
+| GET | `/api/v1/migration/schema/diff` | `SchemaDiffReport` — таблицы, колонки, типы, PK/FK, индексы, CHECK |
 
 ```bash
 # 1. список таблиц источника
@@ -270,10 +446,97 @@ curl "http://localhost:8083/api/v1/migration/tables/insurance_program_users/colu
 
 # 3. первые N строк (N = migration.source.row-limit, по умолчанию 100)
 curl "http://localhost:8083/api/v1/migration/tables/insurance_program_users/rows"
+
+# 4. сравнить количество строк до миграции
+curl "http://localhost:8083/api/v1/migration/status"
+
+# 5. сравнить схему Oracle и PostgreSQL
+curl "http://localhost:8083/api/v1/migration/schema/diff"
+
+# 6. зеркально синхронизировать users и orders из Oracle в PostgreSQL
+curl -X POST "http://localhost:8083/api/v1/migration/run"
 ```
 
+`GET /schema/diff` читает `DatabaseMetaData` Oracle и PostgreSQL и сравнивает:
+
+- наличие таблиц и колонок;
+- совместимость типов с учётом Oracle→PostgreSQL-преобразований;
+- `nullable`, default-значения и identity/auto-increment;
+- primary key по составу колонок;
+- foreign key по колонкам, ссылочной таблице и правилам `ON UPDATE` / `ON DELETE`;
+- unique- и обычные индексы по составу колонок и уникальности;
+- CHECK-constraints (диалектные выражения требуют ручного review).
+
+Имена constraints и индексов не сравниваются: в Oracle и PostgreSQL они различаются.
+Дополнительные объекты приёмника не считаются ошибкой.
+
+В отчёте три уровня:
+
+- `ERROR` — validation не проходит;
+- `WARNING` — требует внимания, но не блокирует validation;
+- `INFO` — материал для ручного review, например различие текста CHECK-выражений.
+
+`valid=true` означает отсутствие `ERROR`. Поведение можно ужесточить:
+
+```yaml
+migration.schema.validation.fail-on-warnings: true
+migration.schema.validation.compare-check-constraints: true
+```
+
+Ограничения: validator не генерирует DDL, не проверяет views/sequences/PLSQL и не заменяет
+ручной review диалектных CHECK-выражений.
+
+Порядок запуска зависит от ownership:
+
+- **Liquibase-owned `public`:** сначала `module-oracle` и `module-postgres` (Liquibase создаёт
+  `users`, `orders`, `insurance_program_users` и `migration_entity_map`), затем `module-migration`.
+- **schema-migration-owned `auto_migration`:** сначала `module-oracle`, затем
+  `module-schema-migration` и `POST /apply`; `module-postgres` не нужен. После этого
+  `module-migration` запускается с `TARGET_POSTGRES_SCHEMA=auto_migration` и делает `POST /run`.
+
+`POST /run` требует, чтобы таблицы `users`, `orders` и `migration_entity_map` уже существовали
+в выбранной target-схеме; иначе вернётся `503`, а точная причина будет в логе `module-migration`.
+
+`/run` не только вставляет и обновляет строки, но и удаляет из PostgreSQL управляемые строки,
+которые исчезли из Oracle. Нативные строки PostgreSQL без записи в `migration_entity_map`
+сохраняются.
+
 Коды ответов: `200` — успех; `404` — таблицы нет в метаданных источника;
-`503` — источник недоступен (сеть, креды, СУБД лежит).
+`409` — конфликт данных в приёмнике (уникальность, FK, check-constraint);
+`503` — источник, приёмник или служебная схема недоступны (сеть, креды, СУБД лежит,
+`module-postgres` ещё не создал таблицы).
+
+### 5.3 Сервис schema migration (`module-schema-migration`, порт 8084)
+
+Создаёт PostgreSQL-схему из Oracle-схемы. По умолчанию target-схема — `auto_migration`.
+
+| Метод | Путь | Выход |
+|---|---|---|
+| GET | `/api/v1/schema-migration/preview` | `SchemaMigrationPlan` — DDL, warnings, unsupported |
+| POST | `/api/v1/schema-migration/apply` | `SchemaMigrationReport` — сколько statements применено |
+| GET | `/api/v1/schema-migration/status` | `SchemaMigrationStatus` — target tables/columns |
+
+```bash
+# 1. Посмотреть DDL, ничего не применяя
+curl "http://localhost:8084/api/v1/schema-migration/preview"
+
+# 2. Создать схему auto_migration
+curl -X POST "http://localhost:8084/api/v1/schema-migration/apply"
+
+# 3. Проверить, что все таблицы/колонки созданы
+curl "http://localhost:8084/api/v1/schema-migration/status"
+```
+
+Пример полного сценария «схема + данные»:
+
+```bash
+# 1. Создать схему из Oracle
+curl -X POST "http://localhost:8084/api/v1/schema-migration/apply"
+
+# 2. Запустить module-migration с TARGET_POSTGRES_SCHEMA=auto_migration
+#    (через IDE env или переменную окружения), затем:
+curl -X POST "http://localhost:8083/api/v1/migration/run"
+```
 
 ---
 
@@ -290,12 +553,15 @@ src/main/resources/db/changelog/
 │   └── 202611/
 │       ├── 202611-changelog-ddl.xml           ← агрегатор файлов версии
 │       ├── create-users-table.xml             ← CREATE TABLE users
-│       └── create-insurance-program-users-table.xml  ← CREATE TABLE insurance_program_users
+│       ├── create-orders-table.xml            ← CREATE TABLE orders + FK на users
+│       ├── create-insurance-program-users-table.xml  ← CREATE TABLE insurance_program_users
+│       └── create-migration-entity-map-table.xml    ← карта source id → target id (только TARGET)
 └── dml/
     ├── changelog-dml-cumulative.xml           ← агрегатор всех версий DML
     └── 202611/
         ├── 202611-changelog-dml.xml           ← агрегатор файлов версии
         ├── insert-initial-users.xml           ← тестовые строки users
+        ├── insert-orders.xml                  ← 4 заказа (только Oracle, SOURCE)
         └── insert-insurance-program-users.xml ← 10 строк (только Oracle, SOURCE)
 ```
 
@@ -306,10 +572,13 @@ database-changelog-master.xml
  ├─ /db/changelog/ddl/changelog-ddl-cumulative.xml        абсолютный classpath-путь
  │    └─ /db/changelog/ddl/202611/202611-changelog-ddl.xml
  │         ├─ create-users-table.xml                      relativeToChangelogFile="true"
- │         └─ create-insurance-program-users-table.xml
+ │         ├─ create-orders-table.xml
+ │         ├─ create-insurance-program-users-table.xml
+ │         └─ create-migration-entity-map-table.xml       только в module-postgres
  └─ /db/changelog/dml/changelog-dml-cumulative.xml        DML строго после DDL
       └─ /db/changelog/dml/202611/202611-changelog-dml.xml
            ├─ insert-initial-users.xml
+           ├─ insert-orders.xml
            └─ insert-insurance-program-users.xml
 ```
 
@@ -327,7 +596,7 @@ database-changelog-master.xml
 В DML: Oracle использует `LOCALTIMESTAMP`, PostgreSQL — `CURRENT_TIMESTAMP`.
 Начальные данные: `oracle_admin` / `oracle_reader` и `postgres_admin` / `postgres_reader`.
 
-### 6.1.1 Таблица `insurance_program_users` — объект миграции
+### 6.1.1 Таблица `insurance_program_users` — демонстрационный объект чтения
 
 | Колонка | Oracle (SOURCE) | PostgreSQL (TARGET) | Примечание |
 |---|---|---|---|
@@ -338,7 +607,39 @@ database-changelog-master.xml
 | `created` | `TIMESTAMP DEFAULT LOCALTIMESTAMP NOT NULL` | `TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL` | |
 
 Сид 10 строк — **только в Oracle** (`insert-insurance-program-users.xml`). В PostgreSQL таблица
-создаётся пустой: данные приедут миграцией в следующей итерации.
+создаётся пустой. Эта таблица пока **не переносится** `module-migration`: она остаётся
+демонстрационным объектом чтения.
+
+### 6.1.2 Таблица `orders`
+
+| Колонка | Oracle (SOURCE) | PostgreSQL (TARGET) | Примечание |
+|---|---|---|---|
+| `id` | `NUMBER(19,0) GENERATED BY DEFAULT AS IDENTITY` | `BIGINT GENERATED BY DEFAULT AS IDENTITY` | PK |
+| `user_id` | `NUMBER(19,0) NOT NULL` | `BIGINT NOT NULL` | FK `fk_orders_user` → `users.id` |
+| `order_number` | `VARCHAR2(50) NOT NULL` | `VARCHAR(50) NOT NULL` | unique `uk_orders_order_number` |
+| `amount` | `NUMBER(12,2) NOT NULL` | `NUMERIC(12,2) NOT NULL` | сумма заказа |
+| `status` | `VARCHAR2(20) DEFAULT 'NEW' NOT NULL` | `VARCHAR(20) DEFAULT 'NEW' NOT NULL` | `ck_orders_status`: NEW/PAID/SHIPPED/CANCELLED |
+| `created_at` | `TIMESTAMP DEFAULT LOCALTIMESTAMP NOT NULL` | `TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL` | |
+
+Сид 4 заказов — **только в Oracle** (`insert-orders.xml`, привязаны к `oracle_admin` и `oracle_reader`).
+В PostgreSQL таблица создаётся пустой; строки появляются после `POST /api/v1/migration/run`.
+При переносе `user_id` не копируется напрямую: исходный id пользователя заменяется на целевой
+по карте `migration_entity_map`; заказы, удалённые из Oracle, удаляются и из PostgreSQL.
+
+### 6.1.3 Таблица `migration_entity_map` — служебная карта зеркала
+
+Создаётся **только в PostgreSQL** модулем `module-postgres`:
+
+| Колонка | Тип | Назначение |
+|---|---|---|
+| `entity_type` | `VARCHAR(20)` | `USER` или `ORDER` |
+| `source_id` | `BIGINT` | id строки в Oracle |
+| `target_id` | `BIGINT` | id соответствующей строки в PostgreSQL |
+| `source_key` | `VARCHAR(255)` | последний известный `username` / `order_number` |
+| `updated_at` | `TIMESTAMP` | время последней синхронизации |
+
+PK — `(entity_type, source_id)`, уникальность — `(entity_type, target_id)`.
+Таблица не является доменной таблицей CRUD-модулей, поэтому в Oracle её копии нет.
 
 ### 6.2 Как добавить миграцию
 
@@ -349,6 +650,8 @@ database-changelog-master.xml
 4. Подключить его **в конец** списка `<include>` в агрегаторе версии.
 5. `<changeSet author="FStavcev" id="уникальное-имя">` + `<sql>` + **обязательный `<rollback>`**.
 6. Повторить для второго модуля — SQL будет отличаться диалектом.
+   Исключение — служебные таблицы мигратора (`migration_entity_map`): они существуют только
+   в PostgreSQL-приёмнике.
 
 Никогда не редактировать уже применённые changeSet'ы и не менять их `id`/`author`.
 
@@ -361,7 +664,7 @@ database-changelog-master.xml
 ```yaml
 spring.datasource.url:      jdbc:oracle:thin:@//localhost:1521/FREEPDB1
 spring.jpa.hibernate.ddl-auto: validate
-spring.jpa.properties.hibernate.dialect: org.hibernate.dialect.OracleDialect
+spring.jpa.properties.hibernate.jdbc.fetch_size: 100
 spring.liquibase.change-log: classpath:/db/changelog/database-changelog-master.xml
 server.port: 8081
 ```
@@ -371,27 +674,77 @@ server.port: 8081
 ```yaml
 spring.datasource.url:      jdbc:postgresql://localhost:5432/oracletopostgres
 spring.jpa.hibernate.ddl-auto: validate
-spring.jpa.properties.hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.properties.hibernate.jdbc.fetch_size: 100
 spring.liquibase.change-log: classpath:/db/changelog/database-changelog-master.xml
 server.port: 8082
 ```
 
-`module-migration/src/main/resources/application.yaml` — JPA нет, только JDBC и HikariCP
+`module-migration/src/main/resources/application.yaml` — JPA нет, два JDBC-подключения и HikariCP
 
 ```yaml
 spring.datasource.url:      jdbc:oracle:thin:@//localhost:1521/FREEPDB1
-spring.datasource.hikari.pool-name: migration-hikari
-spring.datasource.hikari.maximum-pool-size: 10
+spring.datasource.hikari.pool-name: migration-source-hikari
 spring.datasource.hikari.connection-test-query: SELECT 1 FROM DUAL
 migration.source.row-limit: 100
-migration.source.excluded-tables: [DATABASECHANGELOG, DATABASECHANGELOGLOCK]
+migration.source.excluded-tables:
+  - DATABASECHANGELOG
+  - DATABASECHANGELOGLOCK
+  - AQ$_*
+  - HELP
+  - MVIEW$_*
+  - OL$*
+  - REDO_*
+  - SCHEDULER_*
+  - SQLPLUS_PRODUCT_PROFILE
+
+migration.schema.validation.fail-on-warnings: false
+migration.schema.validation.compare-check-constraints: true
+
+migration.target.url:       jdbc:postgresql://localhost:5432/oracletopostgres
+migration.target.schema:    public   # или auto_migration
+
+migration.target.hikari.pool-name: migration-target-hikari
+migration.target.hikari.connection-test-query: SELECT 1
 server.port: 8083
 ```
+
+`module-schema-migration/src/main/resources/application.yaml` — schema migration, порт 8084
+
+```yaml
+spring.datasource.url:      jdbc:oracle:thin:@//localhost:1521/FREEPDB1
+migration.schema.source.schema: ""
+migration.schema.target.url:     jdbc:postgresql://localhost:5432/oracletopostgres
+migration.schema.target.schema:  auto_migration
+server.port: 8084
+```
+
+`migration.target.schema` можно менять прямо в `application.yaml` — env не обязателен.
+Для переключения между `public` и `auto_migration` измени значение и перезапусти приложение.
+Env `TARGET_POSTGRES_SCHEMA` (если задан) имеет приоритет над YAML.
+
+`migration.source.excluded-tables` поддерживает точные имена и шаблоны с `*` в конце
+(например, `AQ$_*`), чтобы не показывать системные объекты Oracle.
+
+`sourceDataSource` помечен `@Primary`, поэтому `spring.datasource` остаётся основным подключением.
+Приёмник настраивается отдельно через `migration.target.*` и имеет собственный
+`targetTransactionManager`; `@Transactional` в `MigrationOrchestrationService` явно указывает его.
+Служебную таблицу `migration_entity_map` создаёт Liquibase модуля `module-postgres`; без неё
+`/run` и `/status` возвращают `503`.
 
 Все креды переопределяются переменными окружения:
 `ORACLE_URL`, `ORACLE_USERNAME`, `ORACLE_PASSWORD`,
 `POSTGRES_URL`, `POSTGRES_USERNAME`, `POSTGRES_PASSWORD`,
-`SOURCE_ORACLE_URL`, `SOURCE_ORACLE_USERNAME`, `SOURCE_ORACLE_PASSWORD`, `SOURCE_ORACLE_SCHEMA`.
+`SOURCE_ORACLE_URL`, `SOURCE_ORACLE_USERNAME`, `SOURCE_ORACLE_PASSWORD`, `SOURCE_ORACLE_SCHEMA`,
+`TARGET_POSTGRES_URL`, `TARGET_POSTGRES_USERNAME`, `TARGET_POSTGRES_PASSWORD`, `TARGET_POSTGRES_SCHEMA`.
+Schema-модуль использует те же имена переменных; для data-модуля в auto-схему задай
+`TARGET_POSTGRES_SCHEMA=auto_migration`.
+
+**Ownership:** `public` создаёт Liquibase `module-postgres`; `auto_migration` создаёт
+`module-schema-migration`. Не запускай оба механизма на одну и ту же схему: либо Liquibase,
+либо schema-мигратор.
+
+`docker-compose.yaml` поднимает Oracle с `ORACLE_PASSWORD=oracle` и без `APP_USER`: приложение
+ходит под встроенным `SYSTEM`, как и задано в `ORACLE_USERNAME`/`SOURCE_ORACLE_USERNAME` по умолчанию.
 
 **Запрещено** менять `ddl-auto` на `update` / `create` / `create-drop`: схемой управляет только Liquibase.
 
@@ -407,16 +760,28 @@ docker compose up -d
 ./gradlew clean build
 
 # 3. Собрать исполняемые jar
-./gradlew :module-oracle:bootJar :module-postgres:bootJar :module-migration:bootJar
+./gradlew :module-oracle:bootJar :module-postgres:bootJar \
+    :module-migration:bootJar :module-schema-migration:bootJar
 # → module-oracle/build/libs/module-oracle-0.0.1-SNAPSHOT.jar
 # → module-postgres/build/libs/module-postgres-0.0.1-SNAPSHOT.jar
 # → module-migration/build/libs/module-migration-0.0.1-SNAPSHOT.jar
+# → module-schema-migration/build/libs/module-schema-migration-0.0.1-SNAPSHOT.jar
 ```
 
 Запуск приложений — **Run/Debug конфигурации IntelliJ IDEA** (см. `KODA.md`, раздел «Сборка и запуск»).
 
 Проверка живости: `GET http://localhost:8081/actuator/health`,
-`http://localhost:8082/actuator/health`, `http://localhost:8083/actuator/health`.
+`http://localhost:8082/actuator/health`, `http://localhost:8083/actuator/health`,
+`http://localhost:8084/actuator/health`.
+
+**Режим A — Liquibase-owned `public`:** поднимите `module-oracle` и `module-postgres`,
+дождитесь `UP`, затем запустите `module-migration` и вызовите
+`POST http://localhost:8083/api/v1/migration/run`.
+
+**Режим B — schema-migration-owned `auto_migration`:** поднимите `module-oracle`,
+запустите `module-schema-migration`, вызовите `POST http://localhost:8084/api/v1/schema-migration/apply`,
+затем запустите `module-migration` с `TARGET_POSTGRES_SCHEMA=auto_migration` и вызовите
+`POST http://localhost:8083/api/v1/migration/run`.
 
 ---
 
@@ -448,12 +813,13 @@ docker compose up -d
   Postgres-специфика — только в `module-postgres`.
 - Общего `common`-модуля нет и не планируется: модули намеренно независимы, дублирование слоёв —
   осознанное решение, а не недоработка. Не «оптимизировать» это объединением.
-- `module-migration` **не** подключается к target-постгресу в текущей итерации.
+- `module-migration` пишет в PostgreSQL только через `PostgresTargetGateway` и `targetJdbcTemplate`;
+  JPA и entity в этом модуле не появляются.
 
 **Безопасность SQL**
 - Имя таблицы из path-параметра **никогда** не подставляется в SQL напрямую: сначала сверка
-  с `DatabaseMetaData` (`MetadataProvider.resolveTableName`), затем каноническое имя из СУБД
-  в кавычках. Обход невозможен.
+  с `DatabaseMetaData` (`MetadataProvider.qualifiedTableName`), затем каноническое имя из СУБД
+  со схемой и в кавычках. Обход невозможен.
 
 ---
 
@@ -462,14 +828,16 @@ docker compose up -d
 | Задача | Файлы |
 |---|---|
 | Добавить поле в `User` | `entity/UserEntity` → `dto/UserRequestDto` + `dto/UserResponseDto` → `mapper/UserMapper` (явный `@Mapping`) → новая миграция в `ddl/YYYYMM/` **в обоих модулях** |
-| Добавить эндпоинт | `controller/UserController` → `service/UserService` (+ Javadoc с примером curl) |
+| Добавить поле в `Order` | `entity/OrderEntity` → `dto/OrderRequestDto` + `dto/OrderResponseDto` → `mapper/OrderMapper` → миграция **в обоих модулях** → при необходимости `PostgresTargetGateway` |
+| Добавить эндпоинт | `controller/UserController` / `controller/OrderController` → соответствующий service (+ Javadoc с примером curl) |
 | Добавить тип ошибки | новый класс в `common/exception/` → ветка в `XGlobalExceptionHandler` |
 | Поменять подключение к БД | `application.yaml` соответствующего модуля (или env-переменные) |
 | Изменить структуру таблицы | **только** новый changeSet в `db/changelog/ddl/YYYYMM/`; entity подтягивается под схему, не наоборот |
 | Сравнить поведение СУБД | одинаковые файлы в `module-oracle` и `module-postgres`, различия — в SQL и `application.yaml` |
-| Добавить источник/приёмник миграции | новая реализация `MetadataProvider` + `RowReader` в `module-migration/source/<db>/`; контроллер не трогается |
+| Добавить источник миграции | новая реализация `MetadataProvider` + `RowReader` в `module-migration/source/<db>/`; контроллер не трогается |
+| Добавить переносимую таблицу | новый `*MigrationService` в `module-migration/service/` + методы в `PostgresTargetGateway` + вызов из `MigrationOrchestrationService` |
 | Поменять лимит строк чтения | `migration.source.row-limit` в `application.yaml` модуля `module-migration` |
-| Добавить эндпоинт миграции | `controller/MigrationController` → `source/service/MigrationSourceService` (+ Javadoc) |
+| Добавить эндпоинт миграции | `controller/MigrationController` → `source/service/MigrationSourceService` или `service/Migration*Service` (+ Javadoc) |
 
 ---
 
@@ -477,22 +845,57 @@ docker compose up -d
 
 1. **Два одинаковых пакета-близнеца.** `baileyseyes.oracletopostgres.oracle.*` и
    `baileyseyes.oracletopostgres.postgres.*` содержат классы с одинаковыми именами
-   (`UserService`, `UserEntity`, `UserController`…). При правке всегда проверяйте полный путь файла.
-2. **`UserMapperImpl` генерируется** в `build/generated/sources/annotationProcessor/...` —
-   в исходниках его нет, руками не создавать.
+   (`UserService`, `OrderService`, `UserEntity`, `OrderEntity`, `UserController`…).
+   При правке всегда проверяйте полный путь файла.
+2. **`UserMapperImpl` / `OrderMapperImpl` генерируются** в `build/generated/sources/annotationProcessor/...` —
+   в исходниках их нет, руками не создавать.
 3. **`ddl-auto=validate`** — если Hibernate ругается на тип колонки, исправляется миграция (новым
    changeSet), а не `ddl-auto`.
-4. **Oracle `NUMBER(19,0)`** выбран под `Long`/`BIGINT`. Проверка на живом Oracle не выполнялась —
-   проект валидировался на H2 в режиме `MODE=Oracle`.
+4. **Oracle `NUMBER(19,0)`** выбран под `Long`/`BIGINT`; связка проверена на живом Oracle 23 Free
+   (контейнер `gvenzl/oracle-free:23-slim`).
 5. **Тестов нет.** Каталоги `src/test` удалены намеренно; при добавлении тестов создать
    `src/test/java/<тот же пакет>` и добавить тестовые зависимости в `build.gradle.kts` модуля.
 6. **`HELP.md`** — артефакт генератора Spring Initializr, к архитектуре отношения не имеет.
-7. **`module-migration` не использует JPA** — нет entity, нет `@Transactional`, нет Liquibase.
-   Схему `insurance_program_users` создают `module-oracle` и `module-postgres` каждый в своей БД.
+7. **`module-migration` не использует JPA** — нет entity и нет Liquibase. `@Transactional` есть
+   только на методе оркестрации и явно указывает `targetTransactionManager` (транзакция приёмника).
+   Схемы создают `module-oracle` и `module-postgres` каждый в своей БД.
 8. **`spring-boot-starter-aop` в Spring Boot 4 отсутствует** — AOP подключён напрямую через
    `org.aspectj:aspectjweaver` (версия из BOM); `AopAutoConfiguration` активируется сам.
 9. **Ограничение выборки в Oracle** — `WHERE ROWNUM <= ?`, а не `FETCH FIRST` (последний требует
-   Oracle 12c+, `ROWNUM` работает везде и проверен на H2 в режиме `MODE=Oracle`).
+   Oracle 12c+, `ROWNUM` работает везде).
+10. **Два `DataSource` в `module-migration`.** Источник помечен `@Primary` и называется
+    `sourceDataSource`; приёмник — `targetDataSource` с отдельным `targetJdbcTemplate` и
+    `targetTransactionManager`. При добавлении бинов явно указывайте qualifier, иначе Spring
+    выберет источник.
+11. **Зеркальная миграция.** Соответствие `source_id → target_id` хранится в
+    `migration_entity_map`, поэтому смена `username`/`order_number` обновляет ту же строку,
+    а удаление в Oracle удаляет строку в PostgreSQL. Нативные строки PostgreSQL без записи
+    в карте (`postgres_admin`/`postgres_reader`) сохраняются: зеркалится только управляемое
+    миграцией множество.
+12. **Схема источника.** `migration.source.schema` используется и для метаданных, и для
+    SQL-запросов через `qualifiedTableName()`. При пустом значении берётся текущая схема
+    подключения. Системные таблицы Oracle отфильтровываются шаблонами `excluded-tables`.
+13. **JDBC-типы Oracle.** `OracleRowReader` нормализует `TIMESTAMP`, `DATE`, `CLOB` и `BLOB`
+    в обычные Java-типы, поэтому `/rows` отдаёт ISO-даты, а не внутренние объекты драйвера.
+    Для миграции `RowValues` дополнительно поддерживает Oracle-специфичные значения.
+14. **Ошибки записи.** Нарушение уникальности, FK или check-constraint при INSERT/UPDATE
+    возвращается как `409`; недоступность БД или отсутствие таблиц — как `503`.
+    `updateUser`/`updateOrder` проверяют количество обновлённых строк.
+15. **Schema diff — диагностический, не миграционный.** `GET /schema/diff` проверяет таблицы,
+    колонки, совместимость типов, nullable, defaults, identity, PK, FK, unique/индексы и CHECK.
+    Ошибки блокируют validation; warnings и info выводятся отдельно. Validator не генерирует DDL
+    и не переносит PL/SQL, sequences, views.
+16. **Schema migration — отдельный модуль.** `module-schema-migration` создаёт/дополняет схему
+    `auto_migration`; `module-postgres` Liquibase продолжает владеть `public`. На одну схему
+    нельзя запускать оба механизма.
+17. **Schema drift.** Schema-модуль добавляет отсутствующие таблицы и nullable-колонки, создаёт
+    индексы/FK для новых таблиц. Типы существующих колонок, PK/unique/FK существующих таблиц
+    автоматически не меняются — это осознанно, чтобы не делать destructive DDL.
+18. **Unsupported Oracle-объекты.** Views, triggers, PL/SQL, synonyms, grants, partitioning,
+    tablespaces не переносятся автоматически и попадают в `unsupportedObjects`/warnings.
+19. **SYSTEM как source.** В демо Oracle-приложением используется `SYSTEM`, поэтому в
+    unsupported-отчёт могут попадать системные views/synonyms/grants. Для production нужен
+    отдельный Oracle-схема-пользователь.
 
 ---
 
@@ -502,9 +905,13 @@ docker compose up -d
 - [ ] Понял, в каком модуле работаю — правки не смешиваются между модулями.
 - [ ] Помню направление миграции: **Oracle (SOURCE) → PostgreSQL (TARGET)**.
 - [ ] Если меняю схему — сделал новый changeSet в `ddl/YYYYMM/` и продублировал во втором CRUD-модуле.
-- [ ] Если меняю CRUD-API — синхронно обновил второй CRUD-модуль (структура должна остаться идентичной).
-- [ ] Если добавляю СУБД в миграцию — только новая реализация контрактов, контроллер не трогаю.
+- [ ] Если меняю CRUD-API — синхронно обновил второй CRUD-модуль (структура должна остаться идентичной),
+      включая `User` и `Order`.
+- [ ] Если добавляю СУБД-источник в миграцию — только новая реализация контрактов, контроллер не трогаю.
+- [ ] Если добавляю переносимую таблицу — обновил `MigrationOrchestrationService`, `MigrationStatus`
+      и `PostgresTargetGateway`.
 - [ ] `ddl-auto` остался `validate`.
-- [ ] Имя таблицы в SQL проходит через `resolveTableName()` — прямой подстановки нет.
+- [ ] Имя таблицы источника в SQL проходит через `qualifiedTableName()` — прямой подстановки нет.
+- [ ] Записи в PostgreSQL идут только через `targetJdbcTemplate` и `targetTransactionManager`.
 - [ ] Запустил `./gradlew clean build` и сборка зелёная.
 - [ ] Не делал `git commit` без явного запроса пользователя.

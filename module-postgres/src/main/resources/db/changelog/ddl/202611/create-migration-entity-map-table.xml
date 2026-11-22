@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet author="FStavcev" id="create-migration-entity-map-table-postgres">
+    <preConditions onFail="MARK_RAN">
+      <not>
+        <tableExists tableName="migration_entity_map"/>
+      </not>
+    </preConditions>
+    <sql>
+      CREATE TABLE IF NOT EXISTS migration_entity_map (
+      entity_type VARCHAR(20) NOT NULL
+      ,source_id BIGINT NOT NULL
+      ,target_id BIGINT NOT NULL
+      ,source_key VARCHAR(255) NOT NULL
+      ,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      ,CONSTRAINT pk_migration_entity_map PRIMARY KEY (entity_type, source_id)
+      ,CONSTRAINT uk_migration_entity_map_target UNIQUE (entity_type, target_id)
+      ,CONSTRAINT ck_migration_entity_map_type CHECK (entity_type IN ('USER', 'ORDER'))
+      );
+    </sql>
+
+    <rollback>
+      <sql>DROP TABLE IF EXISTS migration_entity_map CASCADE;</sql>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>

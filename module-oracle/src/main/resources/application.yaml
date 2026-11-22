@@ -12,7 +12,8 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.OracleDialect
+        jdbc:
+          fetch_size: 100
   liquibase:
     change-log: classpath:/db/changelog/database-changelog-master.xml
 
