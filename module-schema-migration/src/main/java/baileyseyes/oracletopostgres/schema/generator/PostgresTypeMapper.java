@@ -24,10 +24,15 @@ public class PostgresTypeMapper {
             pgType = column.size() > 0 ? "VARCHAR(" + column.size() + ")" : "TEXT";
         } else if (typeName.startsWith("CHAR") || typeName.startsWith("NCHAR")) {
             pgType = "CHAR(" + Math.max(column.size(), 1) + ")";
+        } else if (typeName.contains("JSON")) {
+            pgType = "JSONB";
         } else if (typeName.contains("CLOB")) {
             pgType = "TEXT";
         } else if (typeName.contains("BLOB") || typeName.startsWith("RAW") || typeName.contains("LONG RAW")) {
             pgType = "BYTEA";
+        } else if (typeName.startsWith("LONG")) {
+            pgType = "TEXT";
+            warning = "Oracle LONG для колонки " + column.name() + " преобразован в TEXT";
         } else if (typeName.startsWith("DATE")) {
             pgType = "TIMESTAMP";
         } else if (typeName.startsWith("TIMESTAMP")) {
@@ -36,8 +41,10 @@ public class PostgresTypeMapper {
                 : "TIMESTAMP";
         } else if (typeName.startsWith("BINARY_DOUBLE") || typeName.startsWith("DOUBLE")) {
             pgType = "DOUBLE PRECISION";
-        } else if (typeName.startsWith("BINARY_FLOAT") || typeName.startsWith("FLOAT")) {
+        } else if (typeName.startsWith("BINARY_FLOAT")) {
             pgType = "REAL";
+        } else if (typeName.startsWith("FLOAT")) {
+            pgType = "DOUBLE PRECISION";
         } else if (typeName.startsWith("BOOLEAN")) {
             pgType = "BOOLEAN";
         } else {
@@ -45,6 +52,8 @@ public class PostgresTypeMapper {
             warning = "Неизвестный Oracle-тип " + column.typeName() + " для колонки " + column.name()
                 + "; использован TEXT";
         }
+
+        warning = appendWarning(warning, semanticWarning(typeName, column));
 
         boolean identity = column.identity();
 
@@ -75,13 +84,18 @@ public class PostgresTypeMapper {
         value = value.trim();
         String normalized = value.toUpperCase(Locale.ROOT);
 
-        if (normalized.contains("NEXTVAL") || normalized.contains("CURRVAL")) {
+        if (normalized.contains("NEXTVAL") || normalized.contains("CURRVAL")
+            || normalized.contains("NEXT VALUE FOR")) {
             warnings.add("Default sequence.nextval для " + column.name() + " не перенесён автоматически");
             return null;
         }
 
         if (normalized.contains("TO_DATE") || normalized.contains("TO_TIMESTAMP")
-            || normalized.contains("SYS_GUID")) {
+            || normalized.contains("TO_CHAR") || normalized.contains("TO_NUMBER")
+            || normalized.contains("SYS_GUID") || normalized.contains("SYS_CONTEXT")
+            || normalized.contains("DBMS_RANDOM") || normalized.contains("DECODE")
+            || normalized.contains("NVL") || normalized.contains("UID")
+            || normalized.equals("USER")) {
             warnings.add("Default " + value + " для " + column.name() + " требует ручного преобразования");
             return null;
         }
@@ -135,6 +149,51 @@ public class PostgresTypeMapper {
 
     private boolean isIntegerType(String pgType) {
         return pgType.equals("SMALLINT") || pgType.equals("INTEGER") || pgType.equals("BIGINT");
+    }
+
+    private String semanticWarning(String typeName, OracleColumn column) {
+        StringBuilder warnings = new StringBuilder();
+
+        if (typeName.startsWith("NUMBER") && column.size() == 1 && column.decimalDigits() == 0) {
+            warnings.append("NUMBER(1) для колонки ").append(column.name())
+                .append(" преобразован в BOOLEAN; проверьте, что это флаг. ");
+        }
+
+        if ((typeName.startsWith("VARCHAR2") || typeName.startsWith("NVARCHAR2")
+            || typeName.startsWith("CHAR") || typeName.startsWith("NCHAR"))
+            && "B".equalsIgnoreCase(column.charUsed())) {
+            warnings.append("Колонка ").append(column.name())
+                .append(" объявлена в BYTE-семантике; PostgreSQL VARCHAR/CHAR считает символы. ");
+        }
+
+        if (typeName.startsWith("TIMESTAMP") && typeName.contains("WITH LOCAL TIME ZONE")) {
+            warnings.append("TIMESTAMP WITH LOCAL TIME ZONE для колонки ").append(column.name())
+                .append(" перенесён как TIMESTAMP; проверьте timezone-семантику. ");
+        }
+
+        if (typeName.startsWith("TIMESTAMP") && column.decimalDigits() > 6) {
+            warnings.append("Дробная точность timestamp колонки ").append(column.name())
+                .append(" больше 6 и будет усечена PostgreSQL. ");
+        }
+
+        if (typeName.contains("INTERVAL")) {
+            warnings.append("INTERVAL для колонки ").append(column.name())
+                .append(" преобразован в TEXT; нужна ручная трансформация. ");
+        }
+
+        return warnings.isEmpty() ? null : warnings.toString().trim();
+    }
+
+    private String appendWarning(String first, String second) {
+        if (first == null || first.isBlank()) {
+            return second;
+        }
+
+        if (second == null || second.isBlank()) {
+            return first;
+        }
+
+        return first + " " + second;
     }
 
     private String upper(String value) {

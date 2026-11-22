@@ -8,5 +8,6 @@
   <include file="create-orders-table.xml" relativeToChangelogFile="true"/>
   <include file="create-insurance-program-users-table.xml" relativeToChangelogFile="true"/>
   <include file="create-migration-entity-map-table.xml" relativeToChangelogFile="true"/>
+  <include file="add-migration-entity-map-last-seen-run.xml" relativeToChangelogFile="true"/>
 
 </databaseChangeLog>

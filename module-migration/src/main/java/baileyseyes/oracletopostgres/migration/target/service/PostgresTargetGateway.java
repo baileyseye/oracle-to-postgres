@@ -10,23 +10,16 @@ import baileyseyes.oracletopostgres.migration.common.support.JdbcTableMetadataRe
 import baileyseyes.oracletopostgres.migration.common.support.MigrationEntity;
 import baileyseyes.oracletopostgres.migration.common.support.PrimaryKeyMetadata;
 import baileyseyes.oracletopostgres.migration.target.config.MigrationTargetProperties;
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -42,6 +35,7 @@ public class PostgresTargetGateway {
     private static final String USERS_TABLE = "users";
     private static final String ORDERS_TABLE = "orders";
     private static final String MAPPING_TABLE = "migration_entity_map";
+    private static final long MIGRATION_LOCK_KEY = 7_346_287_123_456_789L;
 
     private final JdbcTemplate targetJdbcTemplate;
     private final DataSource targetDataSource;
@@ -161,7 +155,8 @@ public class PostgresTargetGateway {
 
             if (count == null || count == 0) {
                 throw new TargetAccessException("Таблица '" + table + "' отсутствует в PostgreSQL. "
-                    + "Сначала запустите module-postgres, чтобы Liquibase создал схему.");
+                    + "Создайте схему через Liquibase module-postgres "
+                    + "или POST /api/v1/schema-migration/apply.");
             }
         } catch (DataAccessException exception) {
             throw new TargetAccessException("Не удалось проверить наличие таблицы '" + table + "' в PostgreSQL", exception);
@@ -169,72 +164,65 @@ public class PostgresTargetGateway {
     }
 
     /**
-     * Проверяет наличие служебной таблицы соответствий source id → target id.
+     * Проверяет наличие служебной таблицы соответствий source id → target id
+     * и колонки {@code last_seen_run}, без которой невозможен поиск stale-строк в БД.
      */
     public void requireMappingTable() {
         requireTable(MAPPING_TABLE);
-    }
 
-    /**
-     * Загружает все соответствия для указанного типа сущности.
-     */
-    public Map<Long, MigrationMapping> findMappings(MigrationEntity entity) {
-        String sql = "SELECT source_id, target_id, source_key FROM " + qualifiedTable(MAPPING_TABLE)
-            + " WHERE entity_type = ? ORDER BY source_id";
+        String schema = properties.getSchema();
+        String schemaFilter = schema == null || schema.isBlank() ? null : schema;
 
         try {
-            return targetJdbcTemplate.query(sql, resultSet -> {
-                Map<Long, MigrationMapping> mappings = new LinkedHashMap<>();
+            Integer count = targetJdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns"
+                    + " WHERE table_schema = COALESCE(?, current_schema())"
+                    + " AND table_name = ? AND column_name = 'last_seen_run'",
+                Integer.class, schemaFilter, MAPPING_TABLE);
 
-                while (resultSet.next()) {
-                    mappings.put(
-                        resultSet.getLong("source_id"),
-                        new MigrationMapping(
-                            resultSet.getLong("target_id"),
-                            resultSet.getString("source_key")));
-                }
-
-                return mappings;
-            }, entity.name());
+            if (count == null || count == 0) {
+                throw new TargetAccessException("В таблице migration_entity_map отсутствует колонка last_seen_run. "
+                    + "Примените Liquibase module-postgres или POST /api/v1/schema-migration/apply.");
+            }
         } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось прочитать соответствия сущностей '" + entity + "'", exception);
+            throw new TargetAccessException("Не удалось проверить структуру migration_entity_map", exception);
         }
     }
 
     /**
-     * Создаёт или обновляет соответствие исходной строки целевой.
+     * Возвращает идентификатор текущего запуска.
+     * <br>
+     * Используется XID транзакции PostgreSQL: он уникален, не зависит от часов
+     * и не требует отдельной sequence или полного скана карты соответствий.
      */
-    public void upsertMapping(MigrationEntity entity, long sourceId, long targetId, String sourceKey) {
-        String sql = "INSERT INTO " + qualifiedTable(MAPPING_TABLE)
-            + " (entity_type, source_id, target_id, source_key, updated_at)"
-            + " VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)"
-            + " ON CONFLICT (entity_type, source_id) DO UPDATE"
-            + " SET target_id = EXCLUDED.target_id, source_key = EXCLUDED.source_key,"
-            + " updated_at = CURRENT_TIMESTAMP";
-
+    public long currentRunId() {
         try {
-            targetJdbcTemplate.update(sql, entity.name(), sourceId, targetId, sourceKey);
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Не удалось сохранить соответствие для сущности '"
-                + entity + "' с source id=" + sourceId, exception);
+            Long runId = targetJdbcTemplate.queryForObject("SELECT txid_current()", Long.class);
+
+            if (runId == null) {
+                throw new TargetAccessException("PostgreSQL не вернул идентификатор транзакции миграции");
+            }
+
+            return runId;
         } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось сохранить соответствие для сущности '"
-                + entity + "' с source id=" + sourceId, exception);
+            throw new TargetAccessException("Не удалось получить идентификатор запуска миграции", exception);
         }
     }
 
     /**
-     * Удаляет соответствие исходной строки.
+     * Берёт транзакционную advisory-блокировку, чтобы два запуска миграции
+     * не перетирали {@code last_seen_run} друг друга.
      */
-    public void deleteMapping(MigrationEntity entity, long sourceId) {
-        String sql = "DELETE FROM " + qualifiedTable(MAPPING_TABLE)
-            + " WHERE entity_type = ? AND source_id = ?";
-
+    public void acquireRunLock() {
         try {
-            targetJdbcTemplate.update(sql, entity.name(), sourceId);
+            Boolean locked = targetJdbcTemplate.queryForObject(
+                "SELECT pg_try_advisory_xact_lock(?)", Boolean.class, MIGRATION_LOCK_KEY);
+
+            if (!Boolean.TRUE.equals(locked)) {
+                throw new MigrationConflictException("Уже выполняется другой запуск миграции");
+            }
         } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось удалить соответствие для сущности '"
-                + entity + "' с source id=" + sourceId, exception);
+            throw new TargetAccessException("Не удалось получить блокировку запуска миграции", exception);
         }
     }
 
@@ -249,159 +237,6 @@ public class PostgresTargetGateway {
             return count == null ? 0 : count;
         } catch (DataAccessException exception) {
             throw new TargetAccessException("Не удалось посчитать соответствия сущностей '" + entity + "'", exception);
-        }
-    }
-
-    /**
-     * Загружает целевые id пользователей по их текущим username.
-     */
-    public Map<String, Long> findAllUserIdsByUsername() {
-        String sql = "SELECT id, username FROM " + qualifiedTable(USERS_TABLE);
-
-        try {
-            return targetJdbcTemplate.query(sql, resultSet -> {
-                Map<String, Long> idsByUsername = new LinkedHashMap<>();
-
-                while (resultSet.next()) {
-                    idsByUsername.put(resultSet.getString("username"), resultSet.getLong("id"));
-                }
-
-                return idsByUsername;
-            });
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось прочитать пользователей PostgreSQL", exception);
-        }
-    }
-
-    /**
-     * Загружает целевые id заказов по их текущим order_number.
-     */
-    public Map<String, Long> findAllOrderIdsByOrderNumber() {
-        String sql = "SELECT id, order_number FROM " + qualifiedTable(ORDERS_TABLE);
-
-        try {
-            return targetJdbcTemplate.query(sql, resultSet -> {
-                Map<String, Long> idsByOrderNumber = new LinkedHashMap<>();
-
-                while (resultSet.next()) {
-                    idsByOrderNumber.put(resultSet.getString("order_number"), resultSet.getLong("id"));
-                }
-
-                return idsByOrderNumber;
-            });
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось прочитать заказы PostgreSQL", exception);
-        }
-    }
-
-    public long insertUser(String username, String email, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        try {
-            Long id = targetJdbcTemplate.queryForObject(
-                "INSERT INTO " + qualifiedTable(USERS_TABLE)
-                    + " (username, email, created_at, updated_at) VALUES (?, ?, ?, ?) RETURNING id",
-                Long.class, username, email, Timestamp.valueOf(createdAt), Timestamp.valueOf(updatedAt));
-
-            return Objects.requireNonNull(id, "PostgreSQL не вернул идентификатор пользователя");
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Пользователь '" + username + "' конфликтует с существующей "
-                + "записью в PostgreSQL (уникальность username/email)", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось вставить пользователя '" + username + "' в PostgreSQL", exception);
-        }
-    }
-
-    /**
-     * Обновляет пользователя по целевому id.
-     *
-     * @return {@code true}, если строка найдена и обновлена; {@code false}, если строки уже нет
-     */
-    public boolean updateUser(long id, String username, String email,
-                              LocalDateTime createdAt, LocalDateTime updatedAt) {
-        try {
-            int updated = targetJdbcTemplate.update(
-                "UPDATE " + qualifiedTable(USERS_TABLE)
-                    + " SET username = ?, email = ?, created_at = ?, updated_at = ? WHERE id = ?",
-                username, email, Timestamp.valueOf(createdAt), Timestamp.valueOf(updatedAt), id);
-
-            return updated == 1;
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Пользователь с целевым id=" + id + " конфликтует с существующей "
-                + "записью в PostgreSQL (уникальность username/email)", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось обновить пользователя id=" + id + " в PostgreSQL", exception);
-        }
-    }
-
-    public long insertOrder(long userId, String orderNumber, BigDecimal amount, String status,
-                            LocalDateTime createdAt) {
-        try {
-            Long id = targetJdbcTemplate.queryForObject(
-                "INSERT INTO " + qualifiedTable(ORDERS_TABLE)
-                    + " (user_id, order_number, amount, status, created_at) VALUES (?, ?, ?, ?, ?) RETURNING id",
-                Long.class, userId, orderNumber, amount, status, Timestamp.valueOf(createdAt));
-
-            return Objects.requireNonNull(id, "PostgreSQL не вернул идентификатор заказа");
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Заказ '" + orderNumber + "' конфликтует с существующей "
-                + "записью в PostgreSQL (уникальность номера, FK или статус)", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось вставить заказ '" + orderNumber + "' в PostgreSQL", exception);
-        }
-    }
-
-    /**
-     * Обновляет заказ по целевому id.
-     *
-     * @return {@code true}, если строка найдена и обновлена; {@code false}, если строки уже нет
-     */
-    public boolean updateOrder(long id, long userId, String orderNumber, BigDecimal amount, String status,
-                               LocalDateTime createdAt) {
-        try {
-            int updated = targetJdbcTemplate.update(
-                "UPDATE " + qualifiedTable(ORDERS_TABLE)
-                    + " SET user_id = ?, order_number = ?, amount = ?, status = ?, created_at = ? WHERE id = ?",
-                userId, orderNumber, amount, status, Timestamp.valueOf(createdAt), id);
-
-            return updated == 1;
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Заказ с целевым id=" + id + " конфликтует с существующей "
-                + "записью в PostgreSQL (уникальность номера, FK или статус)", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось обновить заказ id=" + id + " в PostgreSQL", exception);
-        }
-    }
-
-    /**
-     * Удаляет пользователя по целевому id.
-     *
-     * @return {@code true}, если строка была удалена
-     */
-    public boolean deleteUser(long id) {
-        try {
-            return targetJdbcTemplate.update(
-                "DELETE FROM " + qualifiedTable(USERS_TABLE) + " WHERE id = ?", id) == 1;
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Нельзя удалить пользователя id=" + id
-                + ": на него ссылаются заказы в PostgreSQL", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось удалить пользователя id=" + id + " в PostgreSQL", exception);
-        }
-    }
-
-    /**
-     * Удаляет заказ по целевому id.
-     *
-     * @return {@code true}, если строка была удалена
-     */
-    public boolean deleteOrder(long id) {
-        try {
-            return targetJdbcTemplate.update(
-                "DELETE FROM " + qualifiedTable(ORDERS_TABLE) + " WHERE id = ?", id) == 1;
-        } catch (DataIntegrityViolationException exception) {
-            throw new MigrationConflictException("Нельзя удалить заказ id=" + id
-                + ": на него ссылаются дочерние записи в PostgreSQL", exception);
-        } catch (DataAccessException exception) {
-            throw new TargetAccessException("Не удалось удалить заказ id=" + id + " в PostgreSQL", exception);
         }
     }
 

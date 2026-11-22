@@ -16,13 +16,36 @@ spring:
       connection-test-query: SELECT 1 FROM DUAL
 
 migration:
+  mode: ${MIGRATION_MODE:initial-load}  # альтернатива: mirror — зеркальная синхронизация без даунтайма
   schema:
     validation:
       fail-on-warnings: false
       compare-check-constraints: true
+  initial-load:
+    chunk-size: 50000
+    truncate-target: false
+    resume: false
+    populate-mapping: false
+    validate: true
+    require-source-idle: true
+    capture-source-scn: true
+    include-tables:
+      - insurance_program_users
+    exclude-tables: []
+    table-mapping: {}
+    column-mapping: {}
+    lob-chunk-size: 10
+    workers: 4
+    retry-max-attempts: 3
+    retry-initial-backoff-ms: 500
+    retry-max-backoff-ms: 5000
+    analyze: true
+    vacuum: false
   source:
     schema: ${SOURCE_ORACLE_SCHEMA:}
     row-limit: 100
+    chunk-size: 5000
+    fetch-size: 1000
     excluded-tables:
       - DATABASECHANGELOG
       - DATABASECHANGELOGLOCK
@@ -41,8 +64,8 @@ migration:
     schema: ${TARGET_POSTGRES_SCHEMA:public}
     hikari:
       pool-name: migration-target-hikari
-      maximum-pool-size: 5
-      minimum-idle: 1
+      maximum-pool-size: 10
+      minimum-idle: 2
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000

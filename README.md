@@ -12,6 +12,13 @@ data migration, который переносит данные в уже гот�
 - **Liquibase-owned**: схему `public` создаёт `module-postgres`;
 - **schema-migration-owned**: схему `auto_migration` создаёт `module-schema-migration`.
 
+Режим переноса данных выбирается env `MIGRATION_MODE`:
+
+- `initial-load` (**по умолчанию**) — миграция с остановкой окружения: `COPY`, сохранение
+  source id, чанковые коммиты, без upsert и stale-логики;
+- `mirror` — альтернатива для зеркальной синхронизации без остановки по `migration_entity_map`,
+  с upsert/adoption/stale.
+
 > ⚠️ **Этот файл — карта проекта для разработчиков и ИИ-агентов.** Если вы меняете структуру,
 > обновите карту в том же коммите.
 
@@ -30,7 +37,7 @@ data migration, который переносит данные в уже гот�
 | Миграции | Liquibase, XML changelog, стартер `spring-boot-starter-liquibase` |
 | Маппинг | MapStruct 1.6.3 (явная версия) + `lombok-mapstruct-binding:0.2.0` |
 | AOP (`module-migration`) | `org.aspectj:aspectjweaver` без версии — из BOM |
-| Драйверы | `com.oracle.database.jdbc:ojdbc17`, `org.postgresql:postgresql` — оба `runtimeOnly` |
+| Драйверы | `com.oracle.database.jdbc:ojdbc17` (`runtimeOnly`); `org.postgresql:postgresql` (`implementation` в `module-migration` — нужен `CopyManager`) |
 
 ---
 
@@ -167,7 +174,8 @@ module-migration/
     │   │   │   ├── JdbcTableMetadataReader.java  ← колонки, PK и FK через DatabaseMetaData
     │   │   │   ├── MigrationEntity.java          ← тип сущности: USER / ORDER
     │   │   │   ├── PrimaryKeyMetadata.java       ← имя и состав колонок PK
-    │   │   │   └── RowValues.java                ← извлечение колонок Oracle без учёта регистра
+    │   │   │   ├── RowValues.java                ← извлечение колонок Oracle без учёта регистра
+    │   │   │   └── SourceRowMapper.java          ← Oracle row → UserRow/OrderRow вне AOP-логирования
     │   │   └── exception/
     │   │       ├── MigrationException.java      ← базовое RuntimeException модуля
     │   │       ├── TableNotFoundException.java  ← 404, таблицы нет в метаданных
@@ -178,20 +186,33 @@ module-migration/
     │   │
     │   ├── controller/MigrationController.java  ← чтение источника + /run + /status
     │   ├── dto/
-    │   │   ├── MigrationReport.java             ← итоги /run, включая удалённые строки
+    │   │   ├── MigrationReport.java             ← режим, counts, validation, generic tables
     │   │   ├── MigrationStatus.java             ← COUNT(*) и количество управляемых строк
     │   │   ├── SchemaDiffReport.java            ← итог сравнения: errors/warnings/infos
     │   │   ├── SchemaIssue.java                 ← одно расхождение с severity
     │   │   └── TableDiff.java                   ← расхождения по одной таблице
     │   │
-    │   ├── service/                             ← бизнес-логика зеркального переноса
-    │   │   ├── UserMigrationService.java        ← users: mirror по source id + удаление stale
-    │   │   ├── OrderMigrationService.java       ← orders: mirror по source id + FK из карты
-    │   │   ├── MigrationOrchestrationService.java ← users → orders → cleanup
+    │   ├── service/                             ← бизнес-логика переноса
+    │   │   ├── MigrationMode.java               ← MIRROR / INITIAL_LOAD
+    │   │   ├── MigrationRunService.java         ← выбор режима через @Value migration.mode
+    │   │   ├── UserMigrationService.java        ← mirror users: keyset-чанки + stale
+    │   │   ├── OrderMigrationService.java       ← mirror orders: FK через карту в PostgreSQL
+    │   │   ├── MigrationOrchestrationService.java ← mirror: lock → users → orders → cleanup
+    │   │   ├── InitialLoadMigrationService.java ← initial-load: users/orders + generic tables
+    │   │   ├── InitialLoadProperties.java       ← chunk/LOB/retry, truncate/resume, mapping
+    │   │   ├── InitialLoadSourceGuard.java      ← v$session idle-check + SCN
+    │   │   ├── InitialLoadScriptRunner.java     ← pre/post SQL
+    │   │   ├── InitialLoadValidationService.java ← validation users/orders
+    │   │   ├── GenericInitialLoadService.java   ← generic COPY-загрузка остальных таблиц
+    │   │   ├── GenericInitialLoadValidationService.java ← агрегаты и orphan-FK
+    │   │   ├── ChunkRetryExecutor.java          ← retry/backoff COPY-чанков
+    │   │   ├── MigrationJobManager.java         ← async jobs, progress, cancel
     │   │   ├── MigrationStatisticsService.java  ← COUNT(*) в Oracle и PostgreSQL
     │   │   ├── SchemaDiffService.java           ← сравнение таблиц, колонок, PK/FK, индексов, CHECK
     │   │   ├── SchemaTypeCompatibility.java     ← Oracle→PostgreSQL type compatibility
     │   │   ├── SchemaValidationProperties.java  ← fail-on-warnings, check comparison
+    │   │   ├── plan/                            ← plan builder, InitialLoadTablePlan, CSV formatter
+    │   │   ├── row/                             ← UserRow / OrderRow: одна строка чанка
     │   │   └── result/                          ← record-результаты шагов
     │   │
     │   ├── source/                              ← слой доступа к источнику (Oracle)
@@ -201,10 +222,10 @@ module-migration/
     │   │   │   └── SourceDataSourceConfig.java  ← @Primary sourceDataSource + sourceJdbcTemplate
     │   │   ├── contract/
     │   │   │   ├── MetadataProvider.java        ← listTables, listColumns, listIndexes, qualifiedTableName
-    │   │   │   └── RowReader.java               ← readRows, forEachRow
+    │   │   │   └── RowReader.java               ← readRows, readRowsAfter (keyset), forEachRow
     │   │   ├── oracle/
     │   │   │   ├── OracleMetadataProvider.java  ← DatabaseMetaData + схема + wildcard-исключения
-    │   │   │   └── OracleRowReader.java         ← streaming, ROWNUM, нормализация JDBC-типов
+    │   │   │   └── OracleRowReader.java         ← keyset-страницы, ROWNUM, нормализация JDBC-типов
     │   │   └── service/MigrationSourceService.java ← оркестрация read-only эндпоинтов
     │   │
     │   └── target/                              ← слой записи в PostgreSQL
@@ -212,8 +233,11 @@ module-migration/
     │       │   ├── MigrationTargetProperties.java ← @ConfigurationProperties("migration.target")
     │       │   └── TargetDataSourceConfig.java  ← targetDataSource, targetJdbcTemplate, targetTransactionManager
     │       └── service/
-    │           ├── MigrationMapping.java        ← record: target id + последний source key
-    │           └── PostgresTargetGateway.java   ← CRUD users/orders + migration_entity_map
+    │           ├── ChunkResult.java             ← inserted/updated одного чанка
+    │           ├── PostgresChunkGateway.java    ← mirror: staging + set-based upsert/adoption/stale
+    │           ├── InitialLoadTargetGateway.java ← initial-load users/orders: COPY, identity
+    │           ├── GenericInitialLoadTargetGateway.java ← generic COPY, sequences
+    │           └── PostgresTargetGateway.java   ← метаданные, таблицы, advisory lock, счётчики
     │
     └── resources/application.yaml               ← два datasource, migration.source.*, migration.target.*
 ```
@@ -246,17 +270,28 @@ POST /api/v1/migration/run
 MigrationController
  ▼
 MigrationOrchestrationService    @Transactional("targetTransactionManager")
- ├─ UserMigrationService        users: insert/update/delete по source id
- │    └─ migration_entity_map: source user id → target user id
- ├─ OrderMigrationService       orders: insert/update/delete по source id
- │    └─ user_id и order_number берутся из актуальных данных
- └─ UserMigrationService        удаление пользователей, исчезнувших из Oracle
+ ├─ advisory xact lock           защита от параллельных запусков
+ ├─ runId = txid_current()       идентификатор запуска для last_seen_run
+ ├─ UserMigrationService         keyset-страницы users по id
+ │    ├─ OracleRowReader         WHERE id > ? ORDER BY id, ROWNUM <= chunk-size
+ │    ├─ temp staging users      batch INSERT только текущего чанка
+ │    └─ set-based SQL           update mapped / adopt by username / insert new / mark seen
+ ├─ OrderMigrationService        keyset-страницы orders по id
+ │    ├─ temp staging orders     batch INSERT только текущего чанка
+ │    └─ set-based SQL           user_id через join с migration_entity_map
+ └─ UserMigrationService         DELETE ... WHERE last_seen_run <> runId
  ▼
-PostgresTargetGateway           RETURNING id, schema из migration.target.schema
+PostgresChunkGateway             память ограничена одним чанком
 ```
 
+**Память:** источник читается страницами (`migration.source.chunk-size`, по умолчанию 5000),
+и каждая страница сразу уходит в PostgreSQL. В Java нет карт на всю таблицу; сопоставление
+`source_id → target_id`, adoption по `username`/`order_number` и поиск stale-строк выполняются
+SQL в приёмнике. Поэтому heap не зависит от числа записей в Oracle.
+
 **Зеркальность:** для каждого типа сущности хранится соответствие `source_id → target_id`
-в таблице `migration_entity_map` (создаёт Liquibase модуля `module-postgres`). Поэтому:
+в таблице `migration_entity_map` (создаёт Liquibase модуля `module-postgres`). Колонка
+`last_seen_run` фиксирует, что строка встретилась в текущем запуске. Поэтому:
 
 - при смене `username` или `order_number` обновляется **та же** целевая строка;
 - строки, удалённые из Oracle, удаляются из PostgreSQL;
@@ -265,8 +300,58 @@ PostgresTargetGateway           RETURNING id, schema из migration.target.schem
   не имеют записи в `migration_entity_map` и не затрагиваются.
 
 **Идемпотентность:** повторный `/run` обновляет управляемые строки и не создаёт дубликаты.
-Исходные id Oracle в PostgreSQL не копируются — они хранятся только в `migration_entity_map`.
-Все записи приёмника выполняются в одной транзакции: ошибка на любом шаге откатывает весь перенос.
+В mirror-режиме исходные id Oracle в PostgreSQL не копируются — они хранятся только
+в `migration_entity_map`. Все записи приёмника выполняются в одной транзакции: ошибка
+на любом шаге откатывает весь перенос. Параллельный `/run` отклоняется advisory-блокировкой (409).
+
+**Поток initial-load (`MIGRATION_MODE=initial-load`):**
+
+```
+POST /api/v1/migration/run
+ ▼
+MigrationController
+ ▼
+MigrationRunService              @Value("${migration.mode}")
+ ▼
+InitialLoadMigrationService
+ ├─ planBuilder                 таблицы/колонки/PK, FK-порядок
+ ├─ sourceGuard                 v$session idle-check + SCN
+ ├─ pre-load.sql                опционально снять unique/FK
+ ├─ users                       keyset-чанки → COPY (id сохраняется)
+ ├─ orders                      keyset-чанки → COPY (id и user_id сохраняются)
+ ├─ generic tables              keyset или stream → COPY (LOB-aware chunk)
+ ├─ restartSequences            identity + nextval для всех таблиц
+ ├─ populateMapping (optional)  source_id = target_id
+ ├─ post-load.sql               вернуть unique/FK
+ └─ validation                  агрегаты, null, orphan-FK, sequences
+ ▼
+InitialLoadTargetGateway / GenericInitialLoadTargetGateway
+```
+
+`initial-load` не использует upsert, adoption и stale-логику: target должен быть пустым,
+очищенным через `truncate-target=true` или продолжаться с `resume=true`. Каждый чанк
+коммитится отдельно, поэтому падение не откатывает уже загруженные данные, а повтор
+продолжается с `MAX(id)`.
+
+`MAX(id)` — это checkpoint **внутри одного initial-load**, а не требование постоянно
+держать target пустым. После успешной загрузки target полный, и приложение работает с ним.
+Пустым он должен быть только перед первым запуском загрузки (или его очищают явно
+через `truncate-target=true`). Если загрузка упала на середине, `MAX(id)` показывает,
+докуда дошли, и `resume=true` продолжает с этого места. Полноценная job/range-таблица
+понадобится только для параллельных воркеров или нескольких инстансов.
+
+Перед загрузкой проверяется, что в Oracle нет активных сессий в схеме источника
+(`require-source-idle`), и фиксируется SCN (`capture-source-scn`). После загрузки
+выполняется validation: counts, min/max/sum, длины строк, null-поля, orphan-FK и
+sequence/identity. При расхождении job получает `FAILED`, а приложение нельзя открывать.
+
+**Generic-таблицы:** `initial-load.include-tables` задаёт список source-таблиц для
+generic-загрузки (пусто = все, кроме users/orders и `excluded-tables`). Колонки
+сопоставляются по имени; `table-mapping` и `column-mapping` позволяют переименовать
+таблицу/колонку. Для одиночного numeric PK используется keyset и resume по `MAX(id)`,
+для остальных таблиц — потоковое чтение без resume. Таблицы с CLOB/BLOB читаются
+чанком `lob-chunk-size` (по умолчанию 10), чтобы не держать большие LOB в памяти.
+COPY-чанки ретраятся при transient SQLState 08/40/53 с exponential backoff.
 
 **Защита от SQL-инъекций:** имя таблицы из path-параметра проходит через
 `qualifiedTableName()`, который сверяет его со списком из `DatabaseMetaData`, добавляет схему
@@ -318,6 +403,12 @@ GET  /status  → source schema vs target snapshot → missing tables/columns
 
 **Что переносится автоматически:** таблицы, колонки, типы, defaults, identity, PK, unique,
 FK, ordinary indexes, CHECK-constraints (простые выражения), комментарии и пользовательские sequences.
+Для sequences используется Oracle `LAST_NUMBER` как `START WITH`.
+
+**Fidelity warnings:** `NUMBER(1) → BOOLEAN`, BYTE-семантика `VARCHAR2/CHAR`, потеря
+timezone-семантики `TIMESTAMP WITH LOCAL TIME ZONE`, точность timestamp больше 6,
+`LONG/INTERVAL/JSON`, а также Oracle-специфичные CHECK/default-выражения. Такие места
+попадают в warnings и требуют review, а не молча переносятся.
 
 **Что не переносится автоматически и попадает в `unsupportedObjects`/warnings:** views, triggers,
 PL/SQL (procedures/functions/packages/types), synonyms, grants/roles, partitioning, tablespaces.
@@ -433,7 +524,10 @@ curl "http://localhost:8082/api/v1/postgres/get-orders?userId=3&page=0&size=20&s
 | GET | `/api/v1/migration/tables` | `String[]` — таблицы схемы источника (системные и Liquibase исключены) |
 | GET | `/api/v1/migration/tables/{tableName}/columns` | `String[]` — колонки таблицы из `DatabaseMetaData` |
 | GET | `/api/v1/migration/tables/{tableName}/rows` | `List<Map<String,Object>>` — `SELECT *` с лимитом из конфига |
-| POST | `/api/v1/migration/run` | `MigrationReport` — прочитано/вставлено/обновлено/удалено |
+| POST | `/api/v1/migration/run` | синхронный `MigrationReport` |
+| POST | `/api/v1/migration/run/async` | `202 + MigrationJobResponse` — фоновый запуск |
+| GET | `/api/v1/migration/run/{jobId}` | `MigrationJobResponse` — статус, progress, отчёт |
+| POST | `/api/v1/migration/run/{jobId}/cancel` | отмена initial-load между чанками |
 | GET | `/api/v1/migration/status` | `MigrationStatus` — `COUNT(*)` и число управляемых строк |
 | GET | `/api/v1/migration/schema/diff` | `SchemaDiffReport` — таблицы, колонки, типы, PK/FK, индексы, CHECK |
 
@@ -453,9 +547,37 @@ curl "http://localhost:8083/api/v1/migration/status"
 # 5. сравнить схему Oracle и PostgreSQL
 curl "http://localhost:8083/api/v1/migration/schema/diff"
 
-# 6. зеркально синхронизировать users и orders из Oracle в PostgreSQL
+# 6. запустить перенос в режиме из MIGRATION_MODE (по умолчанию initial-load)
 curl -X POST "http://localhost:8083/api/v1/migration/run"
+
+# 7. миграция с остановкой окружения
+MIGRATION_MODE=initial-load \
+  MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET=true \
+  java -jar module-migration/build/libs/module-migration-0.0.1-SNAPSHOT.jar
+curl -X POST "http://localhost:8083/api/v1/migration/run"
+
+# 8. альтернатива без остановки — зеркальная синхронизация
+MIGRATION_MODE=mirror java -jar module-migration/build/libs/module-migration-0.0.1-SNAPSHOT.jar
+curl -X POST "http://localhost:8083/api/v1/migration/run"
+
+# 9. длинная initial-load через async job
+curl -X POST "http://localhost:8083/api/v1/migration/run/async"
+curl "http://localhost:8083/api/v1/migration/run/{jobId}"
+curl -X POST "http://localhost:8083/api/v1/migration/run/{jobId}/cancel"
 ```
+
+`mode` в ответе показывает фактически выбранный режим (`MIRROR` или `INITIAL_LOAD`).
+`MIGRATION_MODE` читается при старте приложения; неверное значение останавливает старт
+с понятной ошибкой.
+
+Состояние async job хранится в памяти процесса. После рестарта приложения job нужно
+продолжить новым запуском с `MIGRATION_INITIAL_LOAD_RESUME=true`; история старых job
+не переживает рестарт. Запускать два initial-load одновременно нельзя: второй получит `409`.
+
+`MigrationJobResponse` содержит `phase`, `table`, `lastId`, `rowsLoaded` (всего),
+`sourceMaxId`, `sourceScn`, `sourceIdle`, `tablesTotal`, `tablesCompleted`,
+`rowsPerSecond`, `etaSeconds`, итоговый `report` и `error`. `MigrationReport.tables`
+перечисляет generic-таблицы и число загруженных строк.
 
 `GET /schema/diff` читает `DatabaseMetaData` Oracle и PostgreSQL и сравнивает:
 
@@ -555,7 +677,8 @@ src/main/resources/db/changelog/
 │       ├── create-users-table.xml             ← CREATE TABLE users
 │       ├── create-orders-table.xml            ← CREATE TABLE orders + FK на users
 │       ├── create-insurance-program-users-table.xml  ← CREATE TABLE insurance_program_users
-│       └── create-migration-entity-map-table.xml    ← карта source id → target id (только TARGET)
+│       ├── create-migration-entity-map-table.xml    ← карта source id → target id (только TARGET)
+│       └── add-migration-entity-map-last-seen-run.xml ← last_seen_run для stale-строк
 └── dml/
     ├── changelog-dml-cumulative.xml           ← агрегатор всех версий DML
     └── 202611/
@@ -636,9 +759,12 @@ database-changelog-master.xml
 | `source_id` | `BIGINT` | id строки в Oracle |
 | `target_id` | `BIGINT` | id соответствующей строки в PostgreSQL |
 | `source_key` | `VARCHAR(255)` | последний известный `username` / `order_number` |
+| `last_seen_run` | `BIGINT` | XID запуска, в котором source id встретился; stale-строки имеют другое значение |
 | `updated_at` | `TIMESTAMP` | время последней синхронизации |
 
 PK — `(entity_type, source_id)`, уникальность — `(entity_type, target_id)`.
+Колонка `last_seen_run` добавляется отдельным changeSet'ом; для `auto_migration` её создаёт
+schema-мигратор (включая `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` для уже существующей таблицы).
 Таблица не является доменной таблицей CRUD-модулей, поэтому в Oracle её копии нет.
 
 ### 6.2 Как добавить миграцию
@@ -685,7 +811,28 @@ server.port: 8082
 spring.datasource.url:      jdbc:oracle:thin:@//localhost:1521/FREEPDB1
 spring.datasource.hikari.pool-name: migration-source-hikari
 spring.datasource.hikari.connection-test-query: SELECT 1 FROM DUAL
+migration.mode: ${MIGRATION_MODE:initial-load}  # альтернатива: mirror — зеркальная синхронизация без даунтайма
+migration.initial-load.chunk-size: 50000
+migration.initial-load.truncate-target: false
+migration.initial-load.resume: false
+migration.initial-load.populate-mapping: false
+migration.initial-load.validate: true
+migration.initial-load.require-source-idle: true
+migration.initial-load.capture-source-scn: true
+migration.initial-load.include-tables: [insurance_program_users]
+migration.initial-load.exclude-tables: []
+migration.initial-load.table-mapping: {}
+migration.initial-load.column-mapping: {}
+migration.initial-load.lob-chunk-size: 10
+migration.initial-load.workers: 4
+migration.initial-load.retry-max-attempts: 3
+migration.initial-load.retry-initial-backoff-ms: 500
+migration.initial-load.retry-max-backoff-ms: 5000
+migration.initial-load.analyze: true
+migration.initial-load.vacuum: false
 migration.source.row-limit: 100
+migration.source.chunk-size: 5000
+migration.source.fetch-size: 1000
 migration.source.excluded-tables:
   - DATABASECHANGELOG
   - DATABASECHANGELOGLOCK
@@ -705,8 +852,42 @@ migration.target.schema:    public   # или auto_migration
 
 migration.target.hikari.pool-name: migration-target-hikari
 migration.target.hikari.connection-test-query: SELECT 1
+migration.target.rewrite-batched-inserts: true
 server.port: 8083
 ```
+
+`migration.source.chunk-size` задаёт размер keyset-страницы mirror-режима и, соответственно,
+верхнюю границу памяти на чанк. `migration.initial-load.chunk-size` — размер COPY-чанка
+initial-load-режима (по умолчанию 50 000). `row-limit` относится только к preview-эндпоинту
+`/tables/{name}/rows`.
+
+Env-переключатели initial-load: `MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET`,
+`MIGRATION_INITIAL_LOAD_RESUME`, `MIGRATION_INITIAL_LOAD_POPULATE_MAPPING`,
+`MIGRATION_INITIAL_LOAD_VALIDATE`, `MIGRATION_INITIAL_LOAD_REQUIRE_SOURCE_IDLE`,
+`MIGRATION_INITIAL_LOAD_CAPTURE_SOURCE_SCN`, `MIGRATION_INITIAL_LOAD_ANALYZE`,
+`MIGRATION_INITIAL_LOAD_INCLUDE_TABLES`, `MIGRATION_INITIAL_LOAD_LOB_CHUNK_SIZE`,
+`MIGRATION_INITIAL_LOAD_RETRY_MAX_ATTEMPTS` (Spring relaxed binding).
+
+`include-tables` по умолчанию содержит `insurance_program_users` для демо. В production
+лучше перечислить таблицы явно: пустой список означает «все source-таблицы, кроме
+users/orders и excluded», что на системной схеме Oracle может быть неожиданно много.
+
+`workers` задаёт число параллельных диапазонов на таблицу. Для него нужен запас
+в source/target Hikari pool (в YAML target pool поднят до 10). `workers=1` возвращает
+строго последовательную загрузку. Параллельные диапазоны используют `MAX(key)`
+в своём диапазоне как checkpoint; отдельная range-таблица не нужна.
+
+Если после cutover планируется `mirror`, включайте `populate-mapping=true` и делайте
+это в том же окне: set-based `source_id = target_id` для users/orders заметно дешевле,
+чем первый mirror-прогон, который будет обновлять все строки и строить mapping через adoption.
+Если mirror не нужен, оставляйте `false` — это экономит запись 100–200 млн строк mapping.
+
+Для `public` уже лежат безопасные примеры скриптов:
+`classpath:initial-load/public-pre-load.sql` — снимает unique/FK перед COPY;
+`classpath:initial-load/public-post-load.sql` — возвращает их после загрузки.
+Для `auto_migration` — `auto-migration-pre-load.sql` / `auto-migration-post-load.sql`.
+Pre-script должен быть идемпотентным (`DROP CONSTRAINT IF EXISTS`): после падения
+он выполнится повторно.
 
 `module-schema-migration/src/main/resources/application.yaml` — schema migration, порт 8084
 
@@ -783,6 +964,57 @@ docker compose up -d
 затем запустите `module-migration` с `TARGET_POSTGRES_SCHEMA=auto_migration` и вызовите
 `POST http://localhost:8083/api/v1/migration/run`.
 
+### 8.1 Runbook: initial-load с остановкой окружения
+
+1. До окна создать target-схему. Для максимальной скорости включить pre/post SQL,
+   которые снимают secondary unique/FK и возвращают их после COPY. PK оставить.
+2. Остановить приложение и всех писателей Oracle, проверить отсутствие активных сессий.
+   `require-source-idle=true` сделает это автоматически и не даст стартовать при живых сессиях.
+3. Запустить `module-migration` с режимом initial-load и pre/post скриптами:
+
+```bash
+export MIGRATION_MODE=initial-load
+export MIGRATION_INITIAL_LOAD_TRUNCATE_TARGET=true
+export MIGRATION_INITIAL_LOAD_PRE_LOAD_SQL=classpath:initial-load/public-pre-load.sql
+export MIGRATION_INITIAL_LOAD_POST_LOAD_SQL=classpath:initial-load/public-post-load.sql
+java -jar module-migration/build/libs/module-migration-0.0.1-SNAPSHOT.jar
+```
+
+4. Запустить async job и следить за progress:
+
+```bash
+JOB_ID=$(curl -s -X POST http://localhost:8083/api/v1/migration/run/async | jq -r .jobId)
+curl "http://localhost:8083/api/v1/migration/run/$JOB_ID"
+```
+
+5. Если процесс упал, перезапустить его с `MIGRATION_INITIAL_LOAD_RESUME=true`
+   (`truncate-target` при этом должен быть `false`). Загрузка продолжит users и orders
+   с `MAX(id)` в target; pre-load script выполнится повторно и должен быть идемпотентным.
+6. Если после cutover планируется mirror-режим, задать `MIGRATION_INITIAL_LOAD_POPULATE_MAPPING=true`:
+   карта заполнится как `source_id = target_id`.
+7. Дождаться, пока validation станет `valid=true`; при `FAILED` приложение не запускать.
+   Затем стартовать приложение и smoke-тесты.
+
+По умолчанию initial-load требует пустой target. `truncate-target=true` очищает
+`users`, `orders` и `migration_entity_map` (`RESTART IDENTITY`). Это удаляет и native-строки
+target, поэтому в окно cutover используется только для выделенного target.
+
+`MAX(id)` — checkpoint текущей загрузки, а не требование всегда держать target пустым.
+После успешного cutover target остаётся полным и используется приложением.
+
+**PostgreSQL tuning для окна.** Для индекс/FK-фазы в post-load SQL уже выставлены
+`SET LOCAL maintenance_work_mem` и `max_parallel_maintenance_workers`; подгони их под железо.
+На сервере имеет смысл заранее проверить `max_wal_size`, `wal_compression`, `shared_buffers`
+и `work_mem`. `synchronous_commit=off` даёт ускорение коммитов, но при OS-crash может
+потерять последние транзакции; для cutover с resume это допустимо только осознанно,
+поэтому в приложении он не включён по умолчанию. После загрузки полезен `VACUUM (ANALYZE)`
+(`migration.initial-load.vacuum=true`) или обычный `ANALYZE` (уже выполняется).
+
+**Parallel ranges.** Для keyset-таблиц `workers` делит `MIN(id)..MAX(id)` на непересекающиеся
+диапазоны. Каждый worker читает только свои колонки, пишет COPY-чанками и коммитит
+отдельные транзакции; resume диапазона — `MAX(id)` внутри диапазона. Для таблиц без
+одиночного integer PK остаётся последовательное потоковое чтение.
+
 ---
 
 ## 9. Правила, которым обязан следовать любой контрактор
@@ -813,8 +1045,9 @@ docker compose up -d
   Postgres-специфика — только в `module-postgres`.
 - Общего `common`-модуля нет и не планируется: модули намеренно независимы, дублирование слоёв —
   осознанное решение, а не недоработка. Не «оптимизировать» это объединением.
-- `module-migration` пишет в PostgreSQL только через `PostgresTargetGateway` и `targetJdbcTemplate`;
-  JPA и entity в этом модуле не появляются.
+- `module-migration` пишет в PostgreSQL только через target-gateways
+  (`PostgresTargetGateway`, `PostgresChunkGateway`, `InitialLoadTargetGateway`,
+  `GenericInitialLoadTargetGateway`) и `targetJdbcTemplate`; JPA и entity здесь не появляются.
 
 **Безопасность SQL**
 - Имя таблицы из path-параметра **никогда** не подставляется в SQL напрямую: сначала сверка
@@ -835,7 +1068,10 @@ docker compose up -d
 | Изменить структуру таблицы | **только** новый changeSet в `db/changelog/ddl/YYYYMM/`; entity подтягивается под схему, не наоборот |
 | Сравнить поведение СУБД | одинаковые файлы в `module-oracle` и `module-postgres`, различия — в SQL и `application.yaml` |
 | Добавить источник миграции | новая реализация `MetadataProvider` + `RowReader` в `module-migration/source/<db>/`; контроллер не трогается |
-| Добавить переносимую таблицу | новый `*MigrationService` в `module-migration/service/` + методы в `PostgresTargetGateway` + вызов из `MigrationOrchestrationService` |
+| Добавить generic-таблицу в initial-load | target-таблица уже создана; добавить source-имя в `migration.initial-load.include-tables` |
+| Переименовать таблицу/колонку при загрузке | `migration.initial-load.table-mapping` / `column-mapping` |
+| Таблица с CLOB/BLOB | уменьшить `migration.initial-load.lob-chunk-size`; generic-загрузчик сам выберет его |
+| Поменять retry COPY-чанка | `retry-max-attempts`, `retry-initial-backoff-ms`, `retry-max-backoff-ms` |
 | Поменять лимит строк чтения | `migration.source.row-limit` в `application.yaml` модуля `module-migration` |
 | Добавить эндпоинт миграции | `controller/MigrationController` → `source/service/MigrationSourceService` или `service/Migration*Service` (+ Javadoc) |
 
@@ -856,8 +1092,9 @@ docker compose up -d
 5. **Тестов нет.** Каталоги `src/test` удалены намеренно; при добавлении тестов создать
    `src/test/java/<тот же пакет>` и добавить тестовые зависимости в `build.gradle.kts` модуля.
 6. **`HELP.md`** — артефакт генератора Spring Initializr, к архитектуре отношения не имеет.
-7. **`module-migration` не использует JPA** — нет entity и нет Liquibase. `@Transactional` есть
-   только на методе оркестрации и явно указывает `targetTransactionManager` (транзакция приёмника).
+7. **`module-migration` не использует JPA** — нет entity и нет Liquibase. В mirror-режиме
+   `@Transactional` стоит только на методе оркестрации и явно указывает `targetTransactionManager`;
+   в initial-load каждый COPY-чанк идёт через `TransactionTemplate` и коммитится отдельно.
    Схемы создают `module-oracle` и `module-postgres` каждый в своей БД.
 8. **`spring-boot-starter-aop` в Spring Boot 4 отсутствует** — AOP подключён напрямую через
    `org.aspectj:aspectjweaver` (версия из BOM); `AopAutoConfiguration` активируется сам.
@@ -871,7 +1108,39 @@ docker compose up -d
     `migration_entity_map`, поэтому смена `username`/`order_number` обновляет ту же строку,
     а удаление в Oracle удаляет строку в PostgreSQL. Нативные строки PostgreSQL без записи
     в карте (`postgres_admin`/`postgres_reader`) сохраняются: зеркалится только управляемое
-    миграцией множество.
+    миграцией множество. `last_seen_run` = XID текущего запуска; строки с другим значением
+    удаляются после orders, чтобы не нарушить FK.
+11.1. **Память не зависит от объёма.** Исходные таблицы читаются keyset-страницами
+    (`migration.source.chunk-size`), страница пишется в `TEMP` staging и применяется
+    set-based SQL. Полных карт source→target и списков source id в Java нет.
+11.2. **Два режима.** По умолчанию `MIGRATION_MODE=initial-load` — миграция с остановкой:
+    COPY с сохранением source id, `truncate-target`/`resume` и отдельным коммитом на чанк.
+    Альтернатива `MIGRATION_MODE=mirror` — зеркальная синхронизация без остановки.
+    `SourceRowMapper` вынесен из пакета `service..*`, иначе `LoggingAspect` писал бы
+    строку лога на каждую запись.
+11.3. **Async job.** `POST /run/async` возвращает `jobId`; `GET /run/{jobId}` отдаёт
+    phase/lastId/rowsLoaded/sourceScn/report; `POST /run/{jobId}/cancel` отменяет
+    initial-load между чанками. В процессе допускается один активный job (409 на второй).
+11.4. **Source consistency и validation.** Перед загрузкой проверяются активные сессии
+    Oracle в схеме источника и фиксируется SCN. После загрузки сравниваются counts,
+    min/max/sum, длины строк, null-поля, orphan-FK и sequence. Несовпадение переводит job
+    в `FAILED`, приложение не должно открываться.
+11.5. **Pre/post SQL.** Индексы и FK снимаются и возвращаются внешними скриптами
+    (`pre-load-sql`/`post-load-sql`), а не автоматическим DDL приложения. Готовые
+    примеры лежат в `module-migration/src/main/resources/initial-load/`.
+11.6. **Generic-таблицы.** users/orders загружаются специализированным путём, остальные —
+    generic-сервисом. Колонки сопоставляются по имени, `table-mapping`/`column-mapping`
+    позволяют переименования. Ключ keyset — одиночный integer PK (NUMBER с scale=0
+    включая); остальные таблицы читаются потоком без resume. LOB-таблицы используют
+    `lob-chunk-size`. Validation для BLOB проверяет count/null, но не побайтовый checksum;
+    для критичных LOB нужна отдельная сверка.
+11.7. **Повторы и мониторинг.** COPY-чанки ретраятся при SQLState 08/40/53; ошибки
+    уникальности/FK/CHECK не ретраятся. Async job отдаёт `tablesTotal`, `tablesCompleted`,
+    `lastId`, `rowsLoaded`, `rowsPerSecond`, `etaSeconds`, `sourceScn`.
+11.8. **Schema fidelity.** Generator добавляет warnings для `NUMBER(1) → BOOLEAN`,
+    BYTE-семантики VARCHAR2/CHAR, `TIMESTAMP WITH LOCAL TIME ZONE`, потери точности
+    timestamp и Oracle-специфичных CHECK/default. Views, triggers, PL/SQL, synonyms,
+    grants, partitioning и tablespaces по-прежнему переносятся вручную.
 12. **Схема источника.** `migration.source.schema` используется и для метаданных, и для
     SQL-запросов через `qualifiedTableName()`. При пустом значении берётся текущая схема
     подключения. Системные таблицы Oracle отфильтровываются шаблонами `excluded-tables`.
@@ -880,7 +1149,8 @@ docker compose up -d
     Для миграции `RowValues` дополнительно поддерживает Oracle-специфичные значения.
 14. **Ошибки записи.** Нарушение уникальности, FK или check-constraint при INSERT/UPDATE
     возвращается как `409`; недоступность БД или отсутствие таблиц — как `503`.
-    `updateUser`/`updateOrder` проверяют количество обновлённых строк.
+    Set-based шаги проверяют полноту карты после каждого чанка: если source-строку нельзя
+    однозначно сопоставить с target-строкой, запуск падает с понятной ошибкой, а не теряет данные.
 15. **Schema diff — диагностический, не миграционный.** `GET /schema/diff` проверяет таблицы,
     колонки, совместимость типов, nullable, defaults, identity, PK, FK, unique/индексы и CHECK.
     Ошибки блокируют validation; warnings и info выводятся отдельно. Validator не генерирует DDL
@@ -908,7 +1178,9 @@ docker compose up -d
 - [ ] Если меняю CRUD-API — синхронно обновил второй CRUD-модуль (структура должна остаться идентичной),
       включая `User` и `Order`.
 - [ ] Если добавляю СУБД-источник в миграцию — только новая реализация контрактов, контроллер не трогаю.
-- [ ] Если добавляю переносимую таблицу — обновил `MigrationOrchestrationService`, `MigrationStatus`
+- [ ] Если добавляю generic-таблицу initial-load — создал target-таблицу и добавил
+      source-имя в `migration.initial-load.include-tables`.
+- [ ] Если меняю mirror users/orders — обновил `MigrationOrchestrationService`, `MigrationStatus`
       и `PostgresTargetGateway`.
 - [ ] `ddl-auto` остался `validate`.
 - [ ] Имя таблицы источника в SQL проходит через `qualifiedTableName()` — прямой подстановки нет.

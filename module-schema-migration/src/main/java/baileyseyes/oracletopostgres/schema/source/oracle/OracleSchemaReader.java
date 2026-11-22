@@ -88,10 +88,11 @@ public class OracleSchemaReader {
     private OracleTable readTable(Connection connection, String schema, String tableName)
         throws SQLException {
         Map<String, String> deleteRules = readDeleteRules(connection, schema, tableName);
+        Map<String, String> charUsed = readCharUsed(connection, schema, tableName);
 
         return new OracleTable(
             tableName,
-            readColumns(connection, schema, tableName),
+            readColumns(connection, schema, tableName, charUsed),
             readPrimaryKey(connection, schema, tableName),
             readIndexes(connection, schema, tableName),
             readForeignKeys(connection, schema, tableName, deleteRules),
@@ -100,25 +101,51 @@ public class OracleSchemaReader {
             readColumnComments(connection, schema, tableName));
     }
 
-    private List<OracleColumn> readColumns(Connection connection, String schema, String table)
+    private List<OracleColumn> readColumns(Connection connection, String schema, String table,
+                                           Map<String, String> charUsed)
         throws SQLException {
         List<OracleColumn> columns = new ArrayList<>();
 
         try (ResultSet resultSet = connection.getMetaData().getColumns(null, schema, table, "%")) {
             while (resultSet.next()) {
+                String columnName = resultSet.getString("COLUMN_NAME");
                 columns.add(new OracleColumn(
-                    resultSet.getString("COLUMN_NAME"),
+                    columnName,
                     resultSet.getString("TYPE_NAME"),
                     resultSet.getInt("DATA_TYPE"),
                     resultSet.getInt("COLUMN_SIZE"),
                     resultSet.getInt("DECIMAL_DIGITS"),
                     resultSet.getInt("NULLABLE") != DatabaseMetaData.columnNoNulls,
                     resultSet.getString("COLUMN_DEF"),
-                    "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT"))));
+                    "YES".equalsIgnoreCase(resultSet.getString("IS_AUTOINCREMENT")),
+                    charUsed.get(columnName)));
             }
         }
 
         return columns;
+    }
+
+    /**
+     * Возвращает BYTE/CHAR-семантику строковых колонок из ALL_TAB_COLUMNS.
+     */
+    private Map<String, String> readCharUsed(Connection connection, String schema, String table)
+        throws SQLException {
+        String sql = "SELECT COLUMN_NAME, CHAR_USED FROM ALL_TAB_COLUMNS"
+            + " WHERE OWNER = ? AND TABLE_NAME = ?";
+        Map<String, String> result = new LinkedHashMap<>();
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, schema);
+            statement.setString(2, table);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    result.put(resultSet.getString("COLUMN_NAME"), resultSet.getString("CHAR_USED"));
+                }
+            }
+        }
+
+        return result;
     }
 
     private List<String> readPrimaryKey(Connection connection, String schema, String table)

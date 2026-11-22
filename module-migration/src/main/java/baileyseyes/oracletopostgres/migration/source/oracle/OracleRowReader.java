@@ -18,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
@@ -35,6 +36,8 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 public class OracleRowReader implements RowReader {
+
+    private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     private final JdbcTemplate jdbcTemplate;
     private final MetadataProvider metadataProvider;
@@ -57,9 +60,72 @@ public class OracleRowReader implements RowReader {
     }
 
     @Override
-    public void forEachRow(String table, Consumer<Map<String, Object>> consumer) {
+    public List<Map<String, Object>> readRowsAfter(String table, String keyColumn, long afterKey, int limit) {
         String qualifiedTable = metadataProvider.qualifiedTableName(table);
-        String sql = "SELECT * FROM " + qualifiedTable;
+        String key = requireSimpleIdentifier(keyColumn);
+        int safeLimit = Math.max(limit, 1);
+
+        String sql = "SELECT * FROM (SELECT * FROM " + qualifiedTable + " WHERE " + key + " > ? ORDER BY " + key
+            + ") WHERE ROWNUM <= ?";
+        log.debug("Чтение страницы таблицы {} после {} с ограничением {}",
+            qualifiedTable, afterKey, safeLimit);
+
+        return executeQuery(sql, table, afterKey, safeLimit);
+    }
+
+    @Override
+    public List<Map<String, Object>> readRowsAfter(String table, String keyColumn, long afterKey, long maxKey,
+                                                   int limit, List<String> columns) {
+        String qualifiedTable = metadataProvider.qualifiedTableName(table);
+        String key = requireSimpleIdentifier(keyColumn);
+        int safeLimit = Math.max(limit, 1);
+        String select = selectList(columns);
+
+        String sql = "SELECT * FROM (SELECT " + select + " FROM " + qualifiedTable
+            + " WHERE " + key + " > ? AND " + key + " <= ? ORDER BY " + key
+            + ") WHERE ROWNUM <= ?";
+        log.debug("Чтение страницы таблицы {} после {} до {} с ограничением {}",
+            qualifiedTable, afterKey, maxKey, safeLimit);
+
+        return executeQuery(sql, table, afterKey, maxKey, safeLimit);
+    }
+
+    @Override
+    public long minKey(String table, String keyColumn) {
+        String qualifiedTable = metadataProvider.qualifiedTableName(table);
+        String key = requireSimpleIdentifier(keyColumn);
+
+        try {
+            Long min = jdbcTemplate.queryForObject(
+                "SELECT MIN(" + key + ") FROM " + qualifiedTable, Long.class);
+
+            return min == null ? Long.MIN_VALUE : min;
+        } catch (DataAccessException exception) {
+            throw new SourceAccessException(
+                "Не удалось прочитать MIN(" + key + ") таблицы " + table, exception);
+        }
+    }
+
+    @Override
+    public long maxKey(String table, String keyColumn) {
+        String qualifiedTable = metadataProvider.qualifiedTableName(table);
+        String key = requireSimpleIdentifier(keyColumn);
+
+        try {
+            Long max = jdbcTemplate.queryForObject(
+                "SELECT MAX(" + key + ") FROM " + qualifiedTable, Long.class);
+
+            return max == null ? Long.MIN_VALUE : max;
+        } catch (DataAccessException exception) {
+            throw new SourceAccessException(
+                "Не удалось прочитать MAX(" + key + ") таблицы " + table, exception);
+        }
+    }
+
+    @Override
+    public void forEachRow(String table, List<String> columns, Consumer<Map<String, Object>> consumer) {
+        String qualifiedTable = metadataProvider.qualifiedTableName(table);
+        String sql = "SELECT " + selectList(columns) + " FROM " + qualifiedTable;
         log.debug("Потоковое чтение таблицы {}", qualifiedTable);
 
         try {
@@ -68,6 +134,32 @@ public class OracleRowReader implements RowReader {
             throw new SourceAccessException(
                 "Не удалось прочитать строки таблицы " + table, exception);
         }
+    }
+
+    private String selectList(List<String> columns) {
+        if (columns == null || columns.isEmpty()) {
+            return "*";
+        }
+
+        StringBuilder select = new StringBuilder();
+
+        for (String column : columns) {
+            if (!select.isEmpty()) {
+                select.append(", ");
+            }
+
+            select.append(requireSimpleIdentifier(column));
+        }
+
+        return select.toString();
+    }
+
+    private String requireSimpleIdentifier(String identifier) {
+        if (identifier == null || !SIMPLE_IDENTIFIER.matcher(identifier).matches()) {
+            throw new SourceAccessException("Недопустимое имя ключевой колонки: " + identifier);
+        }
+
+        return identifier;
     }
 
     private List<Map<String, Object>> executeQuery(String sql, String table, Object... arguments) {
@@ -95,8 +187,8 @@ public class OracleRowReader implements RowReader {
     }
 
     /**
-     * Приводит Oracle-специфичные JDBC-типы к обычным Java-типам, которые корректно
-     * сериализуются в JSON и не зависят от реализации драйвера.
+     * Приводит Oracle-специфичные JDBC-типы к обычным Java-типам,
+     * которые корректно сериализуются в JSON и не зависят от драйвера.
      */
     private Object readValue(ResultSet resultSet, int sqlType, int index) throws SQLException {
         return switch (sqlType) {

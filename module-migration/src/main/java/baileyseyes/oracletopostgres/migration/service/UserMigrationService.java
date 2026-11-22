@@ -1,17 +1,16 @@
 package baileyseyes.oracletopostgres.migration.service;
 
 import baileyseyes.oracletopostgres.migration.common.exception.MigrationException;
-import baileyseyes.oracletopostgres.migration.common.support.MigrationEntity;
-import baileyseyes.oracletopostgres.migration.common.support.RowValues;
+import baileyseyes.oracletopostgres.migration.common.support.SourceRowMapper;
 import baileyseyes.oracletopostgres.migration.service.result.UserMigrationResult;
+import baileyseyes.oracletopostgres.migration.service.row.UserRow;
+import baileyseyes.oracletopostgres.migration.source.config.MigrationSourceProperties;
 import baileyseyes.oracletopostgres.migration.source.contract.RowReader;
-import baileyseyes.oracletopostgres.migration.target.service.MigrationMapping;
+import baileyseyes.oracletopostgres.migration.target.service.ChunkResult;
+import baileyseyes.oracletopostgres.migration.target.service.PostgresChunkGateway;
 import baileyseyes.oracletopostgres.migration.target.service.PostgresTargetGateway;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,10 +18,9 @@ import org.springframework.stereotype.Service;
 /**
  * Зеркальный перенос пользователей из Oracle в PostgreSQL.
  * <br>
- * Соответствие исходного и целевого id хранится в служебной таблице
- * {@code migration_entity_map}. Благодаря этому при следующем запуске пользователь
- * обновляется по стабильному source id даже после смены username, а строки,
- * удалённые из Oracle, удаляются и в PostgreSQL.
+ * Таблица читается keyset-страницами по {@code id}; каждая страница проходит через
+ * временную staging-таблицу PostgreSQL. Соответствие source id → target id хранится
+ * только в {@code migration_entity_map}, поэтому память Java не зависит от объёма таблицы.
  */
 @Slf4j
 @Service
@@ -30,132 +28,67 @@ import org.springframework.stereotype.Service;
 public class UserMigrationService {
 
     private static final String TABLE = "users";
+    private static final String KEY_COLUMN = "id";
 
     private final RowReader rowReader;
+    private final SourceRowMapper rowMapper;
     private final PostgresTargetGateway targetGateway;
+    private final PostgresChunkGateway chunkGateway;
+    private final MigrationSourceProperties properties;
 
-    public UserMigrationResult migrate() {
+    public UserMigrationResult migrate(long runId) {
         targetGateway.requireTable(TABLE);
         targetGateway.requireMappingTable();
+        chunkGateway.prepareUserStaging();
 
-        Map<Long, MigrationMapping> mappings = new LinkedHashMap<>(
-            targetGateway.findMappings(MigrationEntity.USER));
-        Map<String, Long> targetIdsByUsername = targetGateway.findAllUserIdsByUsername();
-        Map<Long, Long> userIdMapping = new LinkedHashMap<>();
-        Set<Long> sourceIds = new LinkedHashSet<>();
-        long[] counters = new long[2];
-        long[] total = new long[1];
+        int chunkSize = Math.max(properties.getChunkSize(), 1);
+        long lastSourceId = Long.MIN_VALUE;
+        long total = 0;
+        long inserted = 0;
+        long updated = 0;
 
-        rowReader.forEachRow(TABLE, row -> {
-            total[0]++;
+        while (true) {
+            List<Map<String, Object>> rows = rowReader.readRowsAfter(
+                TABLE, KEY_COLUMN, lastSourceId, chunkSize);
 
-            Long sourceId = RowValues.asLong(row, "id");
-            String username = RowValues.asString(row, "username");
-            String email = RowValues.asString(row, "email");
-            LocalDateTime createdAt = RowValues.asLocalDateTime(row, "created_at");
-            LocalDateTime updatedAt = RowValues.asLocalDateTime(row, "updated_at");
-
-            requireValue(sourceId, "id", username);
-            requireValue(username, "username", username);
-            requireValue(email, "email", username);
-            requireValue(createdAt, "created_at", username);
-            requireValue(updatedAt, "updated_at", username);
-
-            sourceIds.add(sourceId);
-
-            MigrationMapping previous = mappings.get(sourceId);
-            long targetId = resolveTargetId(
-                sourceId, username, email, createdAt, updatedAt,
-                mappings, targetIdsByUsername, counters);
-
-            if (previous != null) {
-                targetIdsByUsername.remove(previous.sourceKey(), previous.targetId());
+            if (rows.isEmpty()) {
+                break;
             }
 
-            mappings.put(sourceId, new MigrationMapping(targetId, username));
-            targetIdsByUsername.put(username, targetId);
-            userIdMapping.put(sourceId, targetId);
+            List<UserRow> chunk = rows.stream().map(rowMapper::toUser).toList();
+            total += chunk.size();
 
-            targetGateway.upsertMapping(MigrationEntity.USER, sourceId, targetId, username);
-        });
+            chunkGateway.stageUsers(chunk);
+            ChunkResult result = chunkGateway.applyUserChunk(runId);
+            inserted += result.inserted();
+            updated += result.updated();
 
-        Set<Long> staleSourceIds = new LinkedHashSet<>(mappings.keySet());
-        staleSourceIds.removeAll(sourceIds);
+            long nextSourceId = chunk.getLast().sourceId();
 
-        log.info("Зеркальный перенос пользователей завершён: всего={}, вставлено={}, обновлено={}, "
-                + "кандидатов на удаление={}",
-            total[0], counters[0], counters[1], staleSourceIds.size());
+            if (nextSourceId <= lastSourceId) {
+                throw new MigrationException("Keyset-чтение users не продвинулось: "
+                    + lastSourceId + " → " + nextSourceId);
+            }
 
-        return new UserMigrationResult(
-            total[0], counters[0], counters[1], Map.copyOf(userIdMapping), Set.copyOf(staleSourceIds));
+            lastSourceId = nextSourceId;
+
+            if (rows.size() < chunkSize) {
+                break;
+            }
+        }
+
+        log.info("Зеркальный перенос пользователей завершён: всего={}, вставлено={}, обновлено={}",
+            total, inserted, updated);
+
+        return new UserMigrationResult(total, inserted, updated);
     }
 
     /**
      * Удаляет из PostgreSQL пользователей, которые ранее были перенесены,
      * но исчезли из Oracle. Вызывается после удаления устаревших заказов.
      */
-    public long deleteStaleUsers(Set<Long> staleSourceIds) {
-        if (staleSourceIds == null || staleSourceIds.isEmpty()) {
-            return 0;
-        }
-
-        Map<Long, MigrationMapping> mappings = targetGateway.findMappings(MigrationEntity.USER);
-        long deleted = 0;
-
-        for (Long sourceId : staleSourceIds) {
-            MigrationMapping mapping = mappings.get(sourceId);
-
-            if (mapping == null) {
-                continue;
-            }
-
-            if (targetGateway.deleteUser(mapping.targetId())) {
-                deleted++;
-            }
-
-            targetGateway.deleteMapping(MigrationEntity.USER, sourceId);
-        }
-
-        log.info("Удалено пользователей, исчезнувших из Oracle: {}", deleted);
-        return deleted;
+    public long deleteStaleUsers(long runId) {
+        return chunkGateway.deleteStaleUsers(runId);
     }
 
-    private long resolveTargetId(long sourceId, String username, String email,
-                                 LocalDateTime createdAt, LocalDateTime updatedAt,
-                                 Map<Long, MigrationMapping> mappings,
-                                 Map<String, Long> targetIdsByUsername,
-                                 long[] counters) {
-        MigrationMapping mapping = mappings.get(sourceId);
-
-        if (mapping != null) {
-            if (targetGateway.updateUser(mapping.targetId(), username, email, createdAt, updatedAt)) {
-                counters[1]++;
-                return mapping.targetId();
-            }
-
-            targetGateway.deleteMapping(MigrationEntity.USER, sourceId);
-            mappings.remove(sourceId);
-            targetIdsByUsername.remove(mapping.sourceKey(), mapping.targetId());
-        }
-
-        Long adoptedId = targetIdsByUsername.get(username);
-
-        if (adoptedId != null) {
-            if (targetGateway.updateUser(adoptedId, username, email, createdAt, updatedAt)) {
-                counters[1]++;
-                return adoptedId;
-            }
-
-            targetIdsByUsername.remove(username);
-        }
-
-        counters[0]++;
-        return targetGateway.insertUser(username, email, createdAt, updatedAt);
-    }
-
-    private <T> void requireValue(T value, String field, String username) {
-        if (value == null) {
-            throw new MigrationException("У пользователя '" + username + "' отсутствует обязательное поле " + field);
-        }
-    }
 }

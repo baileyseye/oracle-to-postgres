@@ -45,6 +45,25 @@ public class MigrationGlobalExceptionHandler {
         return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, "База данных миграции недоступна");
     }
 
+    @ExceptionHandler(MigrationJobNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleJobNotFound(MigrationJobNotFoundException exception) {
+        log.warn("Job миграции не найден: {}", exception.getMessage());
+        return buildResponse(HttpStatus.NOT_FOUND, exception.getMessage());
+    }
+
+    @ExceptionHandler(MigrationValidationException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MigrationValidationException exception) {
+        log.error("Validation миграции не пройдена: {}", exception.getMessage());
+        Map<String, Object> body = buildBody(HttpStatus.UNPROCESSABLE_CONTENT, exception.getMessage());
+
+        if (exception.getReport() != null) {
+            body.put("report", exception.getReport());
+            body.put("validation", exception.getReport().getValidation());
+        }
+
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(body);
+    }
+
     @ExceptionHandler(MigrationException.class)
     public ResponseEntity<Map<String, Object>> handleMigration(MigrationException exception) {
         log.error("Прикладная ошибка сервиса миграции: {}", exception.getMessage());
@@ -52,12 +71,16 @@ public class MigrationGlobalExceptionHandler {
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {
+        return ResponseEntity.status(status).body(buildBody(status, message));
+    }
+
+    private Map<String, Object> buildBody(HttpStatus status, String message) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", LocalDateTime.now());
         body.put("status", status.value());
         body.put("error", status.getReasonPhrase());
         body.put("message", message);
 
-        return ResponseEntity.status(status).body(body);
+        return body;
     }
 }

@@ -260,12 +260,16 @@ public class PostgresDdlGenerator {
             + "  ,source_id BIGINT NOT NULL\n"
             + "  ,target_id BIGINT NOT NULL\n"
             + "  ,source_key VARCHAR(255) NOT NULL\n"
+            + "  ,last_seen_run BIGINT\n"
             + "  ,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL\n"
             + "  ,CONSTRAINT pk_migration_entity_map PRIMARY KEY (entity_type, source_id)\n"
             + "  ,CONSTRAINT uk_migration_entity_map_target UNIQUE (entity_type, target_id)\n"
             + "  ,CONSTRAINT ck_migration_entity_map_type CHECK (entity_type IN ('USER', 'ORDER'))\n"
             + ")";
         add(statements, "SERVICE_TABLE", "TABLE", MAPPING_TABLE, sql);
+        add(statements, "SERVICE_TABLE", "COLUMN", "last_seen_run",
+            "ALTER TABLE " + quote(schema) + "." + quote(MAPPING_TABLE)
+                + " ADD COLUMN IF NOT EXISTS last_seen_run BIGINT");
     }
 
     private boolean isSupportedCheck(String expression, List<String> warnings, String table) {
@@ -276,7 +280,16 @@ public class PostgresDdlGenerator {
         String upper = expression.toUpperCase(Locale.ROOT);
 
         if (upper.contains("NVL(") || upper.contains("DECODE(") || upper.contains("SYSDATE")
-            || upper.contains("TO_DATE(") || upper.contains("TO_TIMESTAMP(")) {
+            || upper.contains("TO_DATE(") || upper.contains("TO_TIMESTAMP(")
+            || upper.contains("TO_CHAR(") || upper.contains("TO_NUMBER(")
+            || upper.contains("ADD_MONTHS(") || upper.contains("MONTHS_BETWEEN(")
+            || upper.contains("LAST_DAY(") || upper.contains("NEXT_DAY(")
+            || upper.contains("REGEXP_LIKE(") || upper.contains("REGEXP_REPLACE(")
+            || upper.contains("REGEXP_SUBSTR(") || upper.contains("INSTR(")
+            || upper.contains("BITAND(") || upper.contains("SYS_GUID(")
+            || upper.contains("DBMS_") || upper.contains("ROWNUM")
+            || upper.contains("CONNECT BY") || upper.contains("PRIOR ")
+            || upper.equals("USER") || upper.contains(" UID")) {
             warnings.add("CHECK-constraint таблицы " + table + " требует ручного преобразования: " + expression);
             return false;
         }

@@ -1,14 +1,10 @@
 package baileyseyes.oracletopostgres.migration.service.result;
 
-import java.util.Map;
-import java.util.Set;
-
 /**
- * Итоги переноса пользователей и карта «исходный id → целевой id».
+ * Итоги переноса пользователей.
+ * <br>
+ * Карта source id → target id больше не возвращается в Java: заказы разрешают
+ * пользователей через {@code migration_entity_map} внутри PostgreSQL.
  */
-public record UserMigrationResult(long total,
-                                  long inserted,
-                                  long updated,
-                                  Map<Long, Long> userIdMapping,
-                                  Set<Long> staleSourceIds) {
+public record UserMigrationResult(long total, long inserted, long updated) {
 }

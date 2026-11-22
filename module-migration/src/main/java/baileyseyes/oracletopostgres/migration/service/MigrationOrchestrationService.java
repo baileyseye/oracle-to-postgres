@@ -3,6 +3,7 @@ package baileyseyes.oracletopostgres.migration.service;
 import baileyseyes.oracletopostgres.migration.dto.MigrationReport;
 import baileyseyes.oracletopostgres.migration.service.result.OrderMigrationResult;
 import baileyseyes.oracletopostgres.migration.service.result.UserMigrationResult;
+import baileyseyes.oracletopostgres.migration.target.service.PostgresTargetGateway;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,18 +26,23 @@ public class MigrationOrchestrationService {
 
     private final UserMigrationService userMigrationService;
     private final OrderMigrationService orderMigrationService;
+    private final PostgresTargetGateway targetGateway;
 
     @Transactional(transactionManager = "targetTransactionManager")
     public MigrationReport migrateAll() {
         LocalDateTime startedAt = LocalDateTime.now();
 
-        UserMigrationResult users = userMigrationService.migrate();
-        OrderMigrationResult orders = orderMigrationService.migrate(users.userIdMapping());
-        long usersDeleted = userMigrationService.deleteStaleUsers(users.staleSourceIds());
+        targetGateway.acquireRunLock();
+        long runId = targetGateway.currentRunId();
+
+        UserMigrationResult users = userMigrationService.migrate(runId);
+        OrderMigrationResult orders = orderMigrationService.migrate(runId);
+        long usersDeleted = userMigrationService.deleteStaleUsers(runId);
 
         LocalDateTime finishedAt = LocalDateTime.now();
 
         MigrationReport report = MigrationReport.builder()
+            .mode(MigrationMode.MIRROR.name())
             .startedAt(startedAt)
             .finishedAt(finishedAt)
             .usersRead(users.total())

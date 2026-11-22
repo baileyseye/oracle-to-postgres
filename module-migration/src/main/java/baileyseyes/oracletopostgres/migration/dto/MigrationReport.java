@@ -3,6 +3,7 @@ package baileyseyes.oracletopostgres.migration.dto;
 import static lombok.AccessLevel.PRIVATE;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,6 +19,26 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @FieldDefaults(level = PRIVATE)
 public class MigrationReport {
+
+    /**
+     * Режим выполнения: MIRROR или INITIAL_LOAD.
+     */
+    String mode;
+
+    /**
+     * SCN Oracle-источника на момент старта initial-load.
+     */
+    Long sourceScn;
+
+    /**
+     * Проверялся ли источник на отсутствие активных сессий.
+     */
+    Boolean sourceIdle;
+
+    /**
+     * Результат validation source vs target для initial-load.
+     */
+    MigrationValidationReport validation;
 
     /**
      * Момент начала миграции.
@@ -68,4 +89,9 @@ public class MigrationReport {
      * Сколько заказов удалено из PostgreSQL как отсутствующие в Oracle.
      */
     long ordersDeleted;
+
+    /**
+     * Дополнительные таблицы, загруженные generic-путём.
+     */
+    List<TableLoadResult> tables;
 }

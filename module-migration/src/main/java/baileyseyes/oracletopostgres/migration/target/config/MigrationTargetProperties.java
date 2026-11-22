@@ -38,4 +38,11 @@ public class MigrationTargetProperties {
      * Схема приёмника, в которой лежат таблицы миграции.
      */
     String schema = "public";
+
+    /**
+     * Переписывать JDBC batch в multi-row INSERT.
+     * <br>
+     * Уменьшает число round-trip'ов при загрузке staging-чанков.
+     */
+    boolean rewriteBatchedInserts = true;
 }

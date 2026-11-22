@@ -32,7 +32,10 @@ public class SourceDataSourceConfig {
 
     @Bean
     @Primary
-    public JdbcTemplate sourceJdbcTemplate(@Qualifier("sourceDataSource") DataSource sourceDataSource) {
-        return new JdbcTemplate(sourceDataSource);
+    public JdbcTemplate sourceJdbcTemplate(@Qualifier("sourceDataSource") DataSource sourceDataSource,
+                                           MigrationSourceProperties migrationSourceProperties) {
+        JdbcTemplate jdbcTemplate = new JdbcTemplate(sourceDataSource);
+        jdbcTemplate.setFetchSize(migrationSourceProperties.getFetchSize());
+        return jdbcTemplate;
     }
 }

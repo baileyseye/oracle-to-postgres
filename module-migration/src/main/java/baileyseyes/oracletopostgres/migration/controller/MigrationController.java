@@ -2,10 +2,12 @@ package baileyseyes.oracletopostgres.migration.controller;
 
 import static org.springframework.http.ResponseEntity.ok;
 
+import baileyseyes.oracletopostgres.migration.dto.MigrationJobResponse;
 import baileyseyes.oracletopostgres.migration.dto.MigrationReport;
 import baileyseyes.oracletopostgres.migration.dto.MigrationStatus;
 import baileyseyes.oracletopostgres.migration.dto.SchemaDiffReport;
-import baileyseyes.oracletopostgres.migration.service.MigrationOrchestrationService;
+import baileyseyes.oracletopostgres.migration.service.MigrationJobManager;
+import baileyseyes.oracletopostgres.migration.service.MigrationRunService;
 import baileyseyes.oracletopostgres.migration.service.MigrationStatisticsService;
 import baileyseyes.oracletopostgres.migration.service.SchemaDiffService;
 import baileyseyes.oracletopostgres.migration.source.service.MigrationSourceService;
@@ -25,7 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class MigrationController {
 
     private final MigrationSourceService migrationSourceService;
-    private final MigrationOrchestrationService migrationOrchestrationService;
+    private final MigrationRunService migrationRunService;
+    private final MigrationJobManager migrationJobManager;
     private final MigrationStatisticsService migrationStatisticsService;
     private final SchemaDiffService schemaDiffService;
 
@@ -72,12 +75,43 @@ public class MigrationController {
     /**
      * POST {@code http://localhost:8083/api/v1/migration/run}
      * <br>
-     * Переносит пользователей и заказы из Oracle в PostgreSQL.
-     * Повторный запуск идемпотентен: пользователи ищутся по username, заказы — по order_number.
+     * Режим задаётся {@code migration.mode} / env {@code MIGRATION_MODE}:
+     * {@code mirror} — зеркальная синхронизация,
+     * {@code initial-load} — быстрая загрузка на время остановки окружения.
      */
     @PostMapping("/run")
     public ResponseEntity<MigrationReport> runMigration() {
-        return ok(migrationOrchestrationService.migrateAll());
+        return ok(migrationRunService.run());
+    }
+
+    /**
+     * POST {@code http://localhost:8083/api/v1/migration/run/async}
+     * <br>
+     * Запускает миграцию в фоне и возвращает {@code 202 + jobId}.
+     */
+    @PostMapping("/run/async")
+    public ResponseEntity<MigrationJobResponse> runMigrationAsync() {
+        return ResponseEntity.accepted().body(migrationJobManager.start());
+    }
+
+    /**
+     * GET {@code http://localhost:8083/api/v1/migration/run/{jobId}}
+     * <br>
+     * Возвращает статус, progress и итоговый отчёт job.
+     */
+    @GetMapping("/run/{jobId}")
+    public ResponseEntity<MigrationJobResponse> getMigrationJob(@PathVariable String jobId) {
+        return ok(migrationJobManager.get(jobId));
+    }
+
+    /**
+     * POST {@code http://localhost:8083/api/v1/migration/run/{jobId}/cancel}
+     * <br>
+     * Запрашивает отмену initial-load между чанками.
+     */
+    @PostMapping("/run/{jobId}/cancel")
+    public ResponseEntity<MigrationJobResponse> cancelMigrationJob(@PathVariable String jobId) {
+        return ok(migrationJobManager.cancel(jobId));
     }
 
     /**

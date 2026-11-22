@@ -8,6 +8,7 @@ public record OracleColumn(
     int decimalDigits,
     boolean nullable,
     String defaultValue,
-    boolean identity
+    boolean identity,
+    String charUsed
 ) {
 }

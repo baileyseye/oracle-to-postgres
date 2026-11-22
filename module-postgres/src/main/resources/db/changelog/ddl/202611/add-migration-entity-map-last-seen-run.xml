@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+  xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-3.1.xsd">
+
+  <changeSet author="FStavcev" id="add-migration-entity-map-last-seen-run-postgres">
+    <sql>
+      ALTER TABLE migration_entity_map
+      ADD COLUMN IF NOT EXISTS last_seen_run BIGINT;
+    </sql>
+
+    <rollback>
+      <sql>ALTER TABLE migration_entity_map DROP COLUMN IF EXISTS last_seen_run;</sql>
+    </rollback>
+  </changeSet>
+
+</databaseChangeLog>
