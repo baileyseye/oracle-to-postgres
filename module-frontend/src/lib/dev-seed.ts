@@ -16,6 +16,22 @@ interface DevSeedErrorBody {
   readonly output?: string;
 }
 
+function errorMessageForStatus(status: number): string {
+  if (status === 409) {
+    return (
+      'Загрузка большого датасета уже выполняется на dev-сервере. ' +
+      'Дождитесь её завершения (до 15 минут) или перезагрузите вкладку, ' +
+      'чтобы остановить seed.'
+    );
+  }
+
+  if (status === 504) {
+    return 'Загрузка не завершилась за 15 минут, процесс seed остановлен';
+  }
+
+  return `Dev seed HTTP ${status}`;
+}
+
 export class DevSeedError extends Error {
   readonly output: string | null;
 
@@ -57,7 +73,7 @@ export async function seedLargeOracleDataset(): Promise<DevSeedResult> {
     if (!response.ok) {
       const errorBody = body as DevSeedErrorBody;
       throw new DevSeedError(
-        errorBody.message ?? `Dev seed HTTP ${response.status}`,
+        errorBody.message ?? errorMessageForStatus(response.status),
         errorBody.output ?? null,
       );
     }
@@ -69,7 +85,9 @@ export async function seedLargeOracleDataset(): Promise<DevSeedResult> {
     }
 
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new DevSeedError('Загрузка не завершилась за 15 минут');
+      throw new DevSeedError(
+        'Загрузка не завершилась за 15 минут, процесс seed остановлен',
+      );
     }
 
     throw new DevSeedError(

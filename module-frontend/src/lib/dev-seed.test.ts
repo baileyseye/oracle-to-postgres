@@ -52,4 +52,21 @@ describe('dev seed client', () => {
     expect(error.message).toContain('Скрипт seed');
     expect(error.output).toContain('ORA-00001');
   });
+
+  it('explains a 409 when another seed is still running', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 409,
+        text: async () => '',
+      } as Response),
+    );
+
+    const error = await seedLargeOracleDataset().catch((reason) => reason);
+
+    expect(error).toBeInstanceOf(DevSeedError);
+    expect(error.message).toContain('уже выполняется');
+    expect(error.message).toContain('перезагрузите вкладку');
+  });
 });

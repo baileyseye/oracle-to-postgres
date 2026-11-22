@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
@@ -44,7 +44,152 @@ const DEV_SEED_SCRIPT = fileURLToPath(
   new URL('../scripts/seed-large-oracle.ps1', import.meta.url),
 );
 const REPO_ROOT = fileURLToPath(new URL('..', import.meta.url));
+const DEV_SEED_CONTAINER = 'oracle-to-postgres-oracle';
 const DEV_SEED_TIMEOUT_MS = 15 * 60 * 1000;
+const PROCESS_TREE_KILL_TIMEOUT_MS = 5_000;
+
+function hasExited(child: ChildProcess): boolean {
+  return child.exitCode !== null || child.signalCode !== null;
+}
+
+/**
+ * `child.kill()` on Windows terminates only powershell.exe, while the real
+ * work happens in its descendants (docker.exe → sqlplus). `taskkill /T`
+ * walks the whole process tree, so a timed-out seed cannot keep writing to
+ * Oracle. On POSIX the child is a process-group leader (see `detached`
+ * below), so the entire group is killed instead.
+ */
+function killProcessTree(child: ChildProcess): Promise<void> {
+  const pid = child.pid;
+
+  if (!pid || hasExited(child)) {
+    return Promise.resolve();
+  }
+
+  if (process.platform !== 'win32') {
+    try {
+      process.kill(-pid, 'SIGKILL');
+    } catch {
+      child.kill('SIGKILL');
+    }
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let settled = false;
+    let guard: NodeJS.Timeout | null = null;
+
+    const settle = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      if (guard) {
+        clearTimeout(guard);
+      }
+
+      resolve();
+    };
+
+    const killer = spawn(
+      'taskkill',
+      ['/pid', String(pid), '/T', '/F'],
+      { stdio: 'ignore', windowsHide: true },
+    );
+
+    guard = setTimeout(() => {
+      child.kill();
+      settle();
+    }, PROCESS_TREE_KILL_TIMEOUT_MS);
+    guard.unref();
+
+    killer.once('close', settle);
+    killer.once('error', () => {
+      child.kill();
+      settle();
+    });
+  });
+}
+
+function waitForExit(child: ChildProcess, timeoutMs: number): Promise<void> {
+  if (hasExited(child)) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const done = () => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+
+      child.removeListener('close', done);
+      child.removeListener('exit', done);
+      resolve();
+    };
+
+    timer = setTimeout(done, timeoutMs);
+    timer.unref();
+
+    child.once('close', done);
+    child.once('exit', done);
+  });
+}
+
+/**
+ * Killing docker.exe only closes the client connection; the exec process
+ * started inside the container (sqlplus) keeps running (moby/moby#9098).
+ * Ask the container itself to stop the seed session. The Oracle image has no
+ * pkill/pgrep/ps, so walk /proc and kill every process whose cmdline mentions
+ * the seed SQL file. The `[s]` regex keeps the cleanup shell from matching
+ * its own command line.
+ */
+function stopInContainerSeed(): Promise<void> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let guard: NodeJS.Timeout | null = null;
+
+    const settle = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+
+      if (guard) {
+        clearTimeout(guard);
+      }
+
+      resolve();
+    };
+
+    const script = [
+      'for f in /proc/[0-9]*/cmdline; do',
+      'pid=${f#/proc/};',
+      'pid=${pid%/cmdline};',
+      '[ "$pid" = "$$" ] && continue;',
+      'if grep -aq -- \'[s]eed-large-oracle.sql\' "$f" 2>/dev/null; then',
+      'kill -9 "$pid" 2>/dev/null || true;',
+      'fi;',
+      'done',
+    ].join(' ');
+
+    const cleaner = spawn(
+      'docker',
+      ['exec', DEV_SEED_CONTAINER, 'bash', '-lc', script],
+      { stdio: 'ignore', windowsHide: true },
+    );
+
+    guard = setTimeout(settle, PROCESS_TREE_KILL_TIMEOUT_MS);
+    guard.unref();
+
+    cleaner.once('close', settle);
+    cleaner.once('error', settle);
+  });
+}
 
 function createDevSeedPlugin(): Plugin {
   let running = false;
@@ -90,7 +235,10 @@ function createDevSeedPlugin(): Plugin {
         if (running) {
           sendJson(409, {
             ok: false,
-            message: 'Загрузка большого датасета уже выполняется',
+            message:
+              'Загрузка большого датасета уже выполняется на dev-сервере. ' +
+              'Дождитесь её завершения (до 15 минут). Перезагрузка или ' +
+              'закрытие вкладки останавливает seed.',
           });
           return;
         }
@@ -146,7 +294,11 @@ function createDevSeedPlugin(): Plugin {
             '-File',
             DEV_SEED_SCRIPT,
           ],
-          { cwd: REPO_ROOT, windowsHide: true },
+          {
+            cwd: REPO_ROOT,
+            windowsHide: true,
+            detached: process.platform !== 'win32',
+          },
         );
 
         const append = (chunk: Buffer) => {
@@ -156,14 +308,77 @@ function createDevSeedPlugin(): Plugin {
         child.stdout?.on('data', append);
         child.stderr?.on('data', append);
 
+        /**
+         * Force-stops the seed and releases the `running` lock only after the
+         * process tree is gone. Releasing it earlier would let a retry start a
+         * second writer next to a still-dying one.
+         */
+        const stop = async (
+          statusCode: number,
+          body: Record<string, unknown>,
+        ) => {
+          if (finished) {
+            return;
+          }
+
+          finished = true;
+
+          if (timeout) {
+            clearTimeout(timeout);
+          }
+
+          server.config.logger.warn(
+            `[dev-seed] остановка: ${String(body.message ?? 'причина неизвестна')}`,
+          );
+
+          try {
+            await killProcessTree(child);
+            await waitForExit(child, PROCESS_TREE_KILL_TIMEOUT_MS);
+            await stopInContainerSeed();
+          } finally {
+            running = false;
+
+            if (!response.writableEnded && !response.destroyed) {
+              sendJson(statusCode, body);
+            }
+          }
+        };
+
+        const stopSeed = (statusCode: number, body: Record<string, unknown>) => {
+          stop(statusCode, body).catch((error: unknown) => {
+            server.config.logger.error(
+              `[dev-seed] не удалось остановить процесс: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          });
+        };
+
         timeout = setTimeout(() => {
-          child.kill();
-          finish(504, {
+          stopSeed(504, {
             ok: false,
-            message: 'Загрузка не завершилась за 15 минут',
+            message:
+              'Загрузка не завершилась за 15 минут, процесс seed остановлен',
             output,
           });
         }, DEV_SEED_TIMEOUT_MS);
+
+        // The browser reloaded the tab, navigated away or aborted the fetch.
+        // Without this listener the script tree would outlive the request for
+        // up to 15 minutes, keep writing to Oracle and leave `running` set,
+        // so the next attempt would get an unexplained 409.
+        response.on('close', () => {
+          if (finished || response.writableEnded) {
+            return;
+          }
+
+          stopSeed(499, {
+            ok: false,
+            message:
+              'Клиент закрыл соединение — процесс seed остановлен',
+            output,
+          });
+        });
 
         child.on('error', (error) => {
           finish(500, {
